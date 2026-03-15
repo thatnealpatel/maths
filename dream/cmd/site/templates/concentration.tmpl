@@ -1,0 +1,207 @@
+{{define "content"}}
+<style>
+.Conc--Legend {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--ink-light);
+}
+.Conc--LegendEntry {
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.Conc--LegendEntry.disabled {
+    opacity: 0.3;
+}
+.Conc--Swatch {
+    display: inline-block;
+    width: 16px;
+    height: 3px;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+}
+.Conc--Swatch-2  { background: #C0522A; }
+.Conc--Swatch-5  { background: #2E7D8C; }
+.Conc--Swatch-10 { background: #6B6963; }
+.Conc--Swatch-18 { background: #8B6914; }
+.Conc--Swatch-50 { background: #534AB7; }
+</style>
+
+<h1>Concentration of Measure</h1>
+<p>
+    As dimensionality increases, pairwise Euclidean distances between random points
+    concentrate around their expected value. All points become approximately equidistant.
+    This is why distance-based two-sample tests lose power in high dimensions.
+</p>
+
+<hr>
+
+<div class="Section--Label">Controls</div>
+
+<div class="Controls--Row">
+    <div class="Controls--Group">
+        <label>Sample size</label>
+        <select name="n" id="conc-n"
+                hx-get="/robustness/concentration/data"
+                hx-swap="none"
+                hx-sync="this:replace"
+                hx-trigger="load, change"
+                hx-on::after-request="handleConc(event)">
+            <option value="50">n = 50</option>
+            <option value="100">n = 100</option>
+            <option value="200" selected>n = 200</option>
+            <option value="500">n = 500</option>
+        </select>
+    </div>
+</div>
+
+<hr>
+
+<div class="Section--Label">Pairwise Distance Distributions</div>
+
+<div class="Vis">
+    <div class="Vis--Label">d(x,y) / &#x221A;p — normalized pairwise distances</div>
+    <canvas class="Vis--Canvas" id="conc-canvas"></canvas>
+</div>
+
+<div class="Conc--Legend">
+    <span class="Conc--LegendEntry" id="legend-2" onclick="toggleDim(2)">
+        <span class="Conc--Swatch Conc--Swatch-2"></span>p = 2
+    </span>
+    <span class="Conc--LegendEntry" id="legend-5" onclick="toggleDim(5)">
+        <span class="Conc--Swatch Conc--Swatch-5"></span>p = 5
+    </span>
+    <span class="Conc--LegendEntry" id="legend-10" onclick="toggleDim(10)">
+        <span class="Conc--Swatch Conc--Swatch-10"></span>p = 10
+    </span>
+    <span class="Conc--LegendEntry" id="legend-18" onclick="toggleDim(18)">
+        <span class="Conc--Swatch Conc--Swatch-18"></span>p = 18
+    </span>
+    <span class="Conc--LegendEntry" id="legend-50" onclick="toggleDim(50)">
+        <span class="Conc--Swatch Conc--Swatch-50"></span>p = 50
+    </span>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+var concData = null;
+var concVisible = {2: true, 5: true, 10: true, 18: true, 50: true};
+var concColors = {2: '#C0522A', 5: '#2E7D8C', 10: '#6B6963', 18: '#8B6914', 50: '#534AB7'};
+
+function handleConc(event) {
+    if (!event.detail.successful) return;
+    concData = JSON.parse(event.detail.xhr.responseText);
+    drawConc();
+}
+
+function toggleDim(p) {
+    concVisible[p] = !concVisible[p];
+    var entry = document.getElementById('legend-' + p);
+    if (concVisible[p]) {
+        entry.classList.remove('disabled');
+    } else {
+        entry.classList.add('disabled');
+    }
+    drawConc();
+}
+
+function drawConc() {
+    if (!concData) return;
+    var canvas = document.getElementById('conc-canvas');
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var w = rect.width, h = rect.height;
+    var pad = {t: 15, r: 15, b: 35, l: 55};
+    var pw = w - pad.l - pad.r;
+    var ph = h - pad.t - pad.b;
+
+    var edges = concData.edges;
+    var nBins = edges.length - 1;
+
+    var midpoints = [];
+    for (var i = 0; i < nBins; i++) {
+        midpoints.push((edges[i] + edges[i + 1]) / 2);
+    }
+
+    var xmin = edges[0];
+    var xmax = edges[nBins];
+    var ymax = 0;
+    for (var ci = 0; ci < concData.curves.length; ci++) {
+        var c = concData.curves[ci];
+        if (!concVisible[c.p]) continue;
+        for (var i = 0; i < c.density.length; i++) {
+            if (c.density[i] > ymax) ymax = c.density[i];
+        }
+    }
+    if (ymax === 0) ymax = 1;
+    ymax *= 1.1;
+    var ymin = 0;
+
+    function mx(x) { return pad.l + (x - xmin) / (xmax - xmin) * pw; }
+    function my(y) { return pad.t + (ymax - y) / (ymax - ymin) * ph; }
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#D6D2C9';
+    ctx.lineWidth = 1;
+    var xStep = niceStep(xmax - xmin);
+    for (var gx = Math.ceil(xmin / xStep) * xStep; gx <= xmax; gx += xStep) {
+        ctx.beginPath(); ctx.moveTo(mx(gx), pad.t); ctx.lineTo(mx(gx), pad.t + ph); ctx.stroke();
+    }
+    var yStep = niceStep(ymax - ymin);
+    for (var gy = Math.ceil(ymin / yStep) * yStep; gy <= ymax; gy += yStep) {
+        ctx.beginPath(); ctx.moveTo(pad.l, my(gy)); ctx.lineTo(pad.l + pw, my(gy)); ctx.stroke();
+    }
+
+    ctx.strokeStyle = '#A8A49C';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.l, my(0)); ctx.lineTo(pad.l + pw, my(0)); ctx.stroke();
+
+    for (var ci = 0; ci < concData.curves.length; ci++) {
+        var c = concData.curves[ci];
+        if (!concVisible[c.p]) continue;
+        ctx.strokeStyle = concColors[c.p];
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(mx(midpoints[0]), my(c.density[0]));
+        for (var i = 1; i < nBins; i++) {
+            ctx.lineTo(mx(midpoints[i]), my(c.density[i]));
+        }
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = '#A8A49C';
+    ctx.font = '13px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    for (var gx = Math.ceil(xmin / xStep) * xStep; gx <= xmax; gx += xStep) {
+        ctx.fillText(fmtNum(gx), mx(gx), pad.t + ph + 20);
+    }
+    ctx.textAlign = 'right';
+    for (var gy = Math.ceil(ymin / yStep) * yStep; gy <= ymax; gy += yStep) {
+        ctx.fillText(fmtNum(gy), pad.l - 8, my(gy) + 4);
+    }
+}
+
+function niceStep(span) {
+    var rough = span / 6;
+    var mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    var norm = rough / mag;
+    if (norm < 1.5) return mag;
+    if (norm < 3.5) return 2 * mag;
+    if (norm < 7.5) return 5 * mag;
+    return 10 * mag;
+}
+
+function fmtNum(n) {
+    if (Math.abs(n) < 1e-10) return '0';
+    if (Math.abs(n) >= 1000 || (Math.abs(n) < 0.01 && n !== 0)) return n.toExponential(1);
+    return parseFloat(n.toPrecision(4)).toString();
+}
+</script>
+{{end}}

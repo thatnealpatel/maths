@@ -1,0 +1,229 @@
+{{define "content"}}
+<style>
+.EMMD--Tooltip {
+    position: fixed;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-family);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    padding: 0.4rem 0.6rem;
+    pointer-events: none;
+    display: none;
+    z-index: 10;
+}
+.EMMD--Table {
+    width: 100%;
+    margin-top: 1rem;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    color: var(--ink-light);
+}
+.EMMD--Table th,
+.EMMD--Table td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--rule);
+    text-align: right;
+}
+.EMMD--Table th {
+    color: var(--ink-faint);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.8125rem;
+}
+.EMMD--Table td:first-child,
+.EMMD--Table th:first-child {
+    text-align: left;
+}
+.EMMD--Legend {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--ink-light);
+}
+.EMMD--Swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+}
+.EMMD--Swatch-Energy { background: #C0522A; }
+.EMMD--Swatch-MMD { background: #2E7D8C; }
+</style>
+
+<h1>Energy Distance vs. MMD</h1>
+<p>
+    Energy distance and MMD (Maximum Mean Discrepancy) are both kernel/distance-based
+    two-sample test statistics with different sensitivity profiles. This chart compares
+    their rejection rates across four types of distributional shift using permutation tests
+    (B=500, 50 reps per shift type, n=200 per group).
+</p>
+
+<div class="Controls--Tags">
+    <span class="Tag">n = 200 per group</span>
+    <span class="Tag">B = 500 permutations</span>
+    <span class="Tag">50 reps</span>
+    <span class="Tag">&#x03B1; = 0.05</span>
+</div>
+
+<hr>
+
+<div class="Section--Label">Rejection Rates by Shift Type</div>
+
+<div class="Vis">
+    <canvas class="Vis--Canvas" id="emmd-canvas"
+            hx-get="/robustness/energy-vs-mmd/data"
+            hx-swap="none"
+            hx-trigger="load"
+            hx-on::after-request="handleEMMD(event)"></canvas>
+</div>
+
+<div class="EMMD--Legend">
+    <span><span class="EMMD--Swatch EMMD--Swatch-Energy"></span>Energy distance</span>
+    <span><span class="EMMD--Swatch EMMD--Swatch-MMD"></span>MMD (Laplacian)</span>
+</div>
+
+<div id="emmd-table-container"></div>
+
+<div class="EMMD--Tooltip" id="emmd-tooltip"></div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+var emmdData = null;
+var emmdLayout = null;
+
+function handleEMMD(event) {
+    if (!event.detail.successful) return;
+    emmdData = JSON.parse(event.detail.xhr.responseText);
+    drawEMMD();
+    buildTable();
+}
+
+function drawEMMD() {
+    if (!emmdData) return;
+    var canvas = document.getElementById('emmd-canvas');
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var w = rect.width, h = rect.height;
+    var pad = {t: 15, r: 15, b: 40, l: 55};
+    var pw = w - pad.l - pad.r;
+    var ph = h - pad.t - pad.b;
+
+    var shifts = emmdData.shifts;
+    var nShifts = shifts.length;
+    var groupW = pw / nShifts;
+    var barW = groupW * 0.3;
+    var barGap = 4;
+
+    function my(y) { return pad.t + (1 - y) * ph; }
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#D6D2C9';
+    ctx.lineWidth = 1;
+    var yTicks = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
+    for (var yi = 0; yi < yTicks.length; yi++) {
+        var gy = yTicks[yi];
+        ctx.beginPath(); ctx.moveTo(pad.l, my(gy)); ctx.lineTo(pad.l + pw, my(gy)); ctx.stroke();
+    }
+
+    ctx.strokeStyle = '#A8A49C';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, my(0.05));
+    ctx.lineTo(pad.l + pw, my(0.05));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    emmdLayout = {pad: pad, groupW: groupW, barW: barW, barGap: barGap, nShifts: nShifts, ph: ph};
+
+    for (var i = 0; i < nShifts; i++) {
+        var r = emmdData.results[i];
+        var x0 = pad.l + i * groupW + (groupW - 2 * barW - barGap) / 2;
+
+        ctx.fillStyle = '#C0522A';
+        ctx.fillRect(x0, my(r.energy.rejection_rate), barW, r.energy.rejection_rate * ph);
+
+        ctx.fillStyle = '#2E7D8C';
+        ctx.fillRect(x0 + barW + barGap, my(r.mmd.rejection_rate), barW, r.mmd.rejection_rate * ph);
+    }
+
+    ctx.fillStyle = '#A8A49C';
+    ctx.font = '13px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    var shiftLabels = ['Location', 'Scale', 'Correlation', 'Tail'];
+    for (var i = 0; i < nShifts; i++) {
+        ctx.fillText(shiftLabels[i], pad.l + (i + 0.5) * groupW, pad.t + ph + 8);
+    }
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (var yi = 0; yi < yTicks.length; yi++) {
+        ctx.fillText(yTicks[yi].toFixed(1), pad.l - 8, my(yTicks[yi]));
+    }
+
+    ctx.font = '11px IBM Plex Mono, monospace';
+    ctx.fillText('\u03B1=0.05', pad.l - 8, my(0.05));
+}
+
+function buildTable() {
+    if (!emmdData) return;
+    var html = '<table class="EMMD--Table">';
+    html += '<tr><th>Shift</th><th>Energy Rej.</th><th>Energy p&#x0304;</th><th>MMD Rej.</th><th>MMD p&#x0304;</th></tr>';
+    var labels = ['Location', 'Scale', 'Correlation', 'Tail'];
+    for (var i = 0; i < emmdData.results.length; i++) {
+        var r = emmdData.results[i];
+        html += '<tr>';
+        html += '<td>' + labels[i] + '</td>';
+        html += '<td>' + r.energy.rejection_rate.toFixed(2) + '</td>';
+        html += '<td>' + r.energy.mean_pvalue.toFixed(3) + '</td>';
+        html += '<td>' + r.mmd.rejection_rate.toFixed(2) + '</td>';
+        html += '<td>' + r.mmd.mean_pvalue.toFixed(3) + '</td>';
+        html += '</tr>';
+    }
+    html += '</table>';
+    document.getElementById('emmd-table-container').innerHTML = html;
+}
+
+(function() {
+    var canvas = document.getElementById('emmd-canvas');
+    var tip = document.getElementById('emmd-tooltip');
+
+    canvas.addEventListener('mousemove', function(e) {
+        if (!emmdData || !emmdLayout) return;
+        var rect = canvas.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        var lay = emmdLayout;
+
+        var groupIdx = Math.floor((x - lay.pad.l) / lay.groupW);
+        if (groupIdx < 0 || groupIdx >= lay.nShifts) {
+            tip.style.display = 'none';
+            return;
+        }
+
+        var r = emmdData.results[groupIdx];
+        var labels = ['Location', 'Scale', 'Correlation', 'Tail'];
+        tip.innerHTML = labels[groupIdx] + ' shift<br>' +
+            'Energy: ' + r.energy.rejection_rate.toFixed(2) + ' (p\u0304=' + r.energy.mean_pvalue.toFixed(3) + ')<br>' +
+            'MMD: ' + r.mmd.rejection_rate.toFixed(2) + ' (p\u0304=' + r.mmd.mean_pvalue.toFixed(3) + ')';
+        tip.style.display = 'block';
+        tip.style.left = (e.clientX + 12) + 'px';
+        tip.style.top = (e.clientY + 12) + 'px';
+    });
+
+    canvas.addEventListener('mouseleave', function() {
+        tip.style.display = 'none';
+    });
+})();
+</script>
+{{end}}

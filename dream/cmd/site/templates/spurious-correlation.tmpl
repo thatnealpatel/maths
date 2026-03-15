@@ -1,0 +1,179 @@
+{{define "content"}}
+<style>
+.Spurious--Row {
+    display: flex;
+    gap: 1.5rem;
+}
+.Spurious--Panel {
+    flex: 1;
+    min-width: 0;
+}
+.Spurious--Panel .Vis--Canvas {
+    height: auto;
+    aspect-ratio: 1;
+    min-height: 200px;
+}
+.Spurious--Controls .Controls--Group {
+    flex: 1;
+}
+</style>
+
+<h1>Spurious Correlation</h1>
+<p>
+    Dividing independent random variables by a shared random denominator induces
+    spurious positive correlation — but only when the variables have non-zero means.
+    The mechanism is Cov(X&#x1D62;/D, X&#x2C7C;/D) = &#x03BC;&#x00B2;&#x00B7;Var(1/D):
+    at &#x03BC; = 0 the effect vanishes entirely. This matters for PnL analysis where
+    raw returns are normalized by a shared factor (portfolio value, volatility estimate).
+</p>
+
+<hr>
+
+<div class="Section--Label">Controls</div>
+
+<div class="Controls--Row Spurious--Controls">
+    <div class="Controls--Group">
+        <label>Lognormal &#x03C3;</label>
+        <div class="Controls--Slider">
+            <input type="range" name="sigma" min="0.01" max="1" step="0.01" value="0.3"
+                   id="sigma-slider"
+                   hx-get="/robustness/spurious-correlation/data"
+                   hx-include="#components-slider, #mu-slider"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="load, input"
+                   hx-on::after-request="handleSpurious(event)"
+                   oninput="document.getElementById('sigma-readout').textContent = parseFloat(this.value).toFixed(2)">
+            <span class="Controls--Readout" id="sigma-readout">0.30</span>
+        </div>
+    </div>
+    <div class="Controls--Group">
+        <label>Component mean</label>
+        <div class="Controls--Slider">
+            <input type="range" name="mu" min="0" max="2" step="0.01" value="0.5"
+                   id="mu-slider"
+                   hx-get="/robustness/spurious-correlation/data"
+                   hx-include="#sigma-slider, #components-slider"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="input"
+                   hx-on::after-request="handleSpurious(event)"
+                   oninput="document.getElementById('mu-readout').textContent = parseFloat(this.value).toFixed(2)">
+            <span class="Controls--Readout" id="mu-readout">0.50</span>
+        </div>
+    </div>
+    <div class="Controls--Group">
+        <label>Components</label>
+        <div class="Controls--Slider">
+            <input type="range" name="components" min="2" max="10" step="1" value="5"
+                   id="components-slider"
+                   hx-get="/robustness/spurious-correlation/data"
+                   hx-include="#sigma-slider, #mu-slider"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="input"
+                   hx-on::after-request="handleSpurious(event)"
+                   oninput="document.getElementById('comp-readout').textContent = this.value">
+            <span class="Controls--Readout" id="comp-readout">5</span>
+        </div>
+    </div>
+</div>
+
+<hr>
+
+<div class="Section--Label">Correlation Matrices</div>
+
+<div class="Spurious--Row">
+    <div class="Vis Spurious--Panel">
+        <div class="Vis--Label">Before division</div>
+        <canvas class="Vis--Canvas" id="before-canvas"></canvas>
+    </div>
+    <div class="Vis Spurious--Panel">
+        <div class="Vis--Label">After division</div>
+        <canvas class="Vis--Canvas" id="after-canvas"></canvas>
+    </div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+function handleSpurious(event) {
+    if (!event.detail.successful) return;
+    var data = JSON.parse(event.detail.xhr.responseText);
+    drawCorrMatrix(document.getElementById('before-canvas'), data.before, data.labels);
+    drawCorrMatrix(document.getElementById('after-canvas'), data.after, data.labels);
+}
+
+function drawCorrMatrix(canvas, mat, labels) {
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var w = rect.width, h = rect.height;
+    var n = mat.length;
+    var pad = {t: 10, r: 10, b: 30, l: 40};
+    var pw = w - pad.l - pad.r;
+    var ph = h - pad.t - pad.b;
+    var cellW = pw / n;
+    var cellH = ph / n;
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (var i = 0; i < n; i++) {
+        for (var j = 0; j < n; j++) {
+            var v = mat[i][j];
+            var x = pad.l + j * cellW;
+            var y = pad.t + i * cellH;
+
+            ctx.fillStyle = corrColor(v);
+            ctx.fillRect(x, y, cellW, cellH);
+
+            ctx.strokeStyle = '#D6D2C9';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, cellW, cellH);
+
+            var lum = corrLuminance(v);
+            ctx.fillStyle = lum < 0.5 ? '#F5F2EB' : '#2C2B28';
+            ctx.font = (cellW > 40 ? 13 : 11) + 'px IBM Plex Mono, monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(v.toFixed(2), x + cellW / 2, y + cellH / 2);
+        }
+    }
+
+    ctx.fillStyle = '#A8A49C';
+    ctx.font = '13px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (var j = 0; j < n; j++) {
+        ctx.fillText(labels[j], pad.l + (j + 0.5) * cellW, pad.t + ph + 6);
+    }
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (var i = 0; i < n; i++) {
+        ctx.fillText(labels[i], pad.l - 6, pad.t + (i + 0.5) * cellH);
+    }
+}
+
+function corrColor(v) {
+    var t = Math.abs(v);
+    if (v >= 0) {
+        var r = Math.round(245 + (46 - 245) * t);
+        var g = Math.round(242 + (125 - 242) * t);
+        var b = Math.round(235 + (140 - 235) * t);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    var r = Math.round(245 + (192 - 245) * t);
+    var g = Math.round(242 + (82 - 242) * t);
+    var b = Math.round(235 + (42 - 235) * t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+function corrLuminance(v) {
+    var t = Math.abs(v);
+    return 1.0 - t * 0.6;
+}
+</script>
+{{end}}

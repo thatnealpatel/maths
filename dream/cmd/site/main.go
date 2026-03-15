@@ -14,11 +14,14 @@ import (
 	"github.com/thatnealpatel/maths/dream/cmd/site/handlers"
 )
 
-//go:embed templates
-var templateFS embed.FS
+var (
+	//go:embed templates
+	templateFS embed.FS
 
-var addr = flag.String("addr", ":8081", "listen address")
+	addr = flag.String("addr", ":8081", "listen address")
+)
 
+// TODO(nealpatel): Fix idioms and commit CLAUDE.md
 func main() {
 	flag.Parse()
 
@@ -28,6 +31,11 @@ func main() {
 	layoutTmpl := template.Must(template.ParseFS(templateFS, "templates/layout.tmpl"))
 	indexTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/index.tmpl"))
 	fourierTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/fourier-transform.tmpl"))
+	ddplotsTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/dd-plots.tmpl"))
+	concTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/concentration.tmpl"))
+	c2stTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/c2st.tmpl"))
+	spuriousTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/spurious-correlation.tmpl"))
+	emmdTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/energy-vs-mmd.tmpl"))
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("cmd/site/static"))))
@@ -47,6 +55,46 @@ func main() {
 	})
 
 	handlers.RegisterFourier(mux)
+
+	log.Println("precomputing visualizations...")
+	rob := handlers.NewRobustness(ctx)
+	rob.Register(mux)
+	log.Println("precomputation complete")
+
+	mux.HandleFunc("GET /robustness/dd-plots", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := ddplotsTmpl.ExecuteTemplate(w, "layout.tmpl", map[string]string{"Title": "DD-Plots"}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("GET /robustness/concentration", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := concTmpl.ExecuteTemplate(w, "layout.tmpl", map[string]string{"Title": "Concentration of Measure"}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("GET /robustness/c2st", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := c2stTmpl.ExecuteTemplate(w, "layout.tmpl", map[string]string{"Title": "C2ST Power Surface"}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("GET /robustness/spurious-correlation", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := spuriousTmpl.ExecuteTemplate(w, "layout.tmpl", map[string]string{"Title": "Spurious Correlation"}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("GET /robustness/energy-vs-mmd", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := emmdTmpl.ExecuteTemplate(w, "layout.tmpl", map[string]string{"Title": "Energy vs. MMD"}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
 
 	srv := &http.Server{Addr: *addr, Handler: mux}
 

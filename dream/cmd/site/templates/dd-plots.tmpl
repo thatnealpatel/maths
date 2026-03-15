@@ -1,0 +1,199 @@
+{{define "content"}}
+<style>
+.DDPlots--Row {
+    display: flex;
+    gap: 1rem;
+}
+.DDPlots--Panel {
+    flex: 1;
+    min-width: 0;
+}
+.DDPlots--Panel .Vis--Canvas {
+    height: auto;
+    aspect-ratio: 1;
+    min-height: 200px;
+}
+.DDPlots--Controls .Controls--Group {
+    flex: 1;
+}
+.DDPlots--Legend {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--ink-light);
+}
+.DDPlots--Swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+}
+.DDPlots--Swatch-F1 {
+    background: #2E7D8C;
+}
+.DDPlots--Swatch-F2 {
+    background: #C0522A;
+}
+</style>
+
+<h1>DD-Plots</h1>
+<p>
+    A DD-plot (depth-vs-depth plot) shows the halfspace depth of each observation
+    relative to two samples. When F&#x2081; = F&#x2082;, points cluster along
+    the diagonal. Different distributional shifts produce characteristic departures.
+</p>
+
+<hr>
+
+<div class="Section--Label">Controls</div>
+
+<div class="Controls--Row DDPlots--Controls">
+    <div class="Controls--Group">
+        <label>Location shift</label>
+        <div class="Controls--Slider">
+            <input type="range" name="shift" min="0" max="3" step="0.05" value="1.5"
+                   id="slider-a"
+                   hx-get="/robustness/dd-plots/data?panel=a"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="load, input"
+                   hx-on::after-request="handleDD(event)"
+                   oninput="updateReadout('a', this.value)">
+            <span class="Controls--Readout" id="readout-a">1.50</span>
+        </div>
+    </div>
+    <div class="Controls--Group">
+        <label>Scale multiplier</label>
+        <div class="Controls--Slider">
+            <input type="range" name="scale" min="1" max="4" step="0.05" value="2"
+                   id="slider-b"
+                   hx-get="/robustness/dd-plots/data?panel=b"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="load, input"
+                   hx-on::after-request="handleDD(event)"
+                   oninput="updateReadout('b', this.value)">
+            <span class="Controls--Readout" id="readout-b">2.00</span>
+        </div>
+    </div>
+    <div class="Controls--Group">
+        <label>Correlation</label>
+        <div class="Controls--Slider">
+            <input type="range" name="rho" min="0" max="0.95" step="0.01" value="0.8"
+                   id="slider-c"
+                   hx-get="/robustness/dd-plots/data?panel=c"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="load, input"
+                   hx-on::after-request="handleDD(event)"
+                   oninput="updateReadout('c', this.value)">
+            <span class="Controls--Readout" id="readout-c">0.80</span>
+        </div>
+    </div>
+</div>
+
+<hr>
+
+<div class="Section--Label">Depth-Depth Plots</div>
+
+<div class="DDPlots--Row">
+    <div class="Vis DDPlots--Panel">
+        <div class="Vis--Label" id="label-a">Location shift (&#x0394;&#x03BC; = 1.5)</div>
+        <canvas class="Vis--Canvas" id="panel-a"></canvas>
+    </div>
+    <div class="Vis DDPlots--Panel">
+        <div class="Vis--Label" id="label-b">Scale shift (2.0&#x00D7; &#x03C3;)</div>
+        <canvas class="Vis--Canvas" id="panel-b"></canvas>
+    </div>
+    <div class="Vis DDPlots--Panel">
+        <div class="Vis--Label" id="label-c">Correlation shift (&#x03C1; = 0.80)</div>
+        <canvas class="Vis--Canvas" id="panel-c"></canvas>
+    </div>
+</div>
+
+<div class="DDPlots--Legend">
+    <span><span class="DDPlots--Swatch DDPlots--Swatch-F1"></span>Sample 1 (F&#x2081;)</span>
+    <span><span class="DDPlots--Swatch DDPlots--Swatch-F2"></span>Sample 2 (F&#x2082;)</span>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+function handleDD(event) {
+    if (!event.detail.successful) return;
+    var data = JSON.parse(event.detail.xhr.responseText);
+    drawDD(document.getElementById('panel-' + data.panel), data.points);
+}
+
+function updateReadout(panel, value) {
+    var v = parseFloat(value);
+    document.getElementById('readout-' + panel).textContent = v.toFixed(2);
+    var label = document.getElementById('label-' + panel);
+    switch (panel) {
+    case 'a': label.textContent = 'Location shift (\u0394\u03BC = ' + v.toFixed(1) + ')'; break;
+    case 'b': label.textContent = 'Scale shift (' + v.toFixed(1) + '\u00D7 \u03C3)'; break;
+    case 'c': label.textContent = 'Correlation shift (\u03C1 = ' + v.toFixed(2) + ')'; break;
+    }
+}
+
+function drawDD(canvas, points) {
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var w = rect.width, h = rect.height;
+    var pad = {t: 10, r: 10, b: 30, l: 40};
+    var pw = w - pad.l - pad.r;
+    var ph = h - pad.t - pad.b;
+
+    var xmin = 0, xmax = 0.5, ymin = 0, ymax = 0.5;
+
+    function mx(x) { return pad.l + (x - xmin) / (xmax - xmin) * pw; }
+    function my(y) { return pad.t + (ymax - y) / (ymax - ymin) * ph; }
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#D6D2C9';
+    ctx.lineWidth = 1;
+    for (var g = 0; g <= 0.5; g += 0.1) {
+        ctx.beginPath(); ctx.moveTo(mx(g), pad.t); ctx.lineTo(mx(g), pad.t + ph); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(pad.l, my(g)); ctx.lineTo(pad.l + pw, my(g)); ctx.stroke();
+    }
+
+    ctx.strokeStyle = '#A8A49C';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(mx(0), my(0));
+    ctx.lineTo(mx(0.5), my(0.5));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    var colors = ['#2E7D8C', '#C0522A'];
+    ctx.globalAlpha = 0.5;
+    for (var i = 0; i < points.length; i++) {
+        var p = points[i];
+        ctx.fillStyle = colors[p.group];
+        ctx.beginPath();
+        ctx.arc(mx(p.x), my(p.y), 2.5, 0, 2 * Math.PI);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+
+    ctx.fillStyle = '#A8A49C';
+    ctx.font = '13px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    for (var g = 0; g <= 0.5; g += 0.1) {
+        ctx.fillText(g.toFixed(1), mx(g), pad.t + ph + 18);
+    }
+    ctx.textAlign = 'right';
+    for (var g = 0; g <= 0.5; g += 0.1) {
+        ctx.fillText(g.toFixed(1), pad.l - 6, my(g) + 4);
+    }
+}
+</script>
+{{end}}
