@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 )
@@ -38,12 +39,12 @@ func exportSVGs(P, Q Distribution, sigma float64, nSamp int, seed int64, outDir 
 	for _, j := range jobs {
 		svg, err := j.gen()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error generating %s: %v\n", j.name, err)
+			log.Printf("error generating %s: %v", j.name, err)
 			continue
 		}
 		path := outDir + "/" + j.name + ".svg"
 		if err := os.WriteFile(path, svg, 0644); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing %s: %v\n", path, err)
+			log.Printf("error writing %s: %v", path, err)
 			continue
 		}
 		fmt.Printf("  Wrote %s\n", path)

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -134,12 +135,16 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandlePlot(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	if len(path) <= len("/plot/")+len(".svg") {
+	name, ok := strings.CutPrefix(r.URL.Path, "/plot/")
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	name := path[len("/plot/") : len(path)-len(".svg")]
+	name, ok = strings.CutSuffix(name, ".svg")
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
