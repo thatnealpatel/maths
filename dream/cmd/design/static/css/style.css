@@ -1,0 +1,344 @@
+:root {
+  --paper:     #F5F2EB;
+  --ink:       #2C2B28;
+  --ink-light: #6B6963;
+  --ink-faint: #A8A49C;
+  --rule:      #D6D2C9;
+  --input-bg:  #EDEAE2;
+
+  --font-family: 'IBM Plex Mono', monospace;
+}
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-family);
+  font-weight: 400;
+  line-height: 1.7;
+}
+
+h1 {
+  font-size: 1.6875rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+
+h2 {
+  font-size: 1.3125rem;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 0.4rem;
+}
+
+h3 {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  color: var(--ink-light);
+  margin-bottom: 0.3rem;
+}
+
+p {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--ink-light);
+  margin-bottom: 1rem;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 2rem 0;
+}
+
+.Section--Label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.4rem;
+  margin-bottom: 1.5rem;
+}
+
+.Math--Inline {
+  font-size: 1rem;
+  background: var(--input-bg);
+  padding: 0.1em 0.35em;
+  font-family: inherit;
+}
+
+.Math--Block {
+  background: var(--input-bg);
+  border-left: 2px solid var(--ink);
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--ink);
+  margin: 1.25rem 0;
+  overflow-x: auto;
+}
+
+.Btn {
+  font-family: var(--font-family);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 0.55rem 1.2rem;
+  border-radius: 0;
+  cursor: pointer;
+  background: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.Btn--Primary {
+  border: 1px solid var(--ink);
+  color: var(--ink);
+}
+
+.Btn--Primary:hover,
+.Btn--Primary.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.Btn--Secondary {
+  border: 1px solid var(--rule);
+  color: var(--ink-faint);
+}
+
+.Btn--Secondary:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.Tag {
+  display: inline-block;
+  font-size: 0.875rem;
+  font-family: var(--font-family);
+  color: var(--ink-light);
+  border: 1px solid var(--rule);
+  padding: 0.15rem 0.5rem;
+  border-radius: 0;
+  letter-spacing: 0.03em;
+}
+
+.Controls--Row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.Controls--Group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.Controls--Group label {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-faint);
+}
+
+.Controls--Expression {
+  width: 200px;
+}
+
+.Controls--Number {
+  width: 72px;
+}
+
+.Controls--Slider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.Controls--Slider input[type="range"] {
+  flex: 1;
+}
+
+.Controls--Readout {
+  font-size: 1rem;
+  color: var(--ink);
+  min-width: 3rem;
+  text-align: right;
+}
+
+.Controls--Actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.Controls--Tags {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+input[type="text"],
+input[type="number"] {
+  font-family: var(--font-family);
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--input-bg);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  padding: 0.5rem 0.6rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+  border-color: var(--ink);
+}
+
+select {
+  font-family: var(--font-family);
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--input-bg);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  padding: 0.5rem 0.6rem;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+select:focus {
+  border-color: var(--ink);
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: var(--rule);
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--ink);
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--ink);
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.Vis {
+  border: 1px solid var(--rule);
+  padding: 1rem;
+  position: relative;
+}
+
+.Vis--Label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-faint);
+  margin-bottom: 0.75rem;
+}
+
+.Vis--Canvas {
+  display: block;
+  width: 100%;
+  height: 300px;
+}
+
+.Proof {
+  list-style: none;
+  counter-reset: proof;
+}
+
+.Proof--Step {
+  counter-increment: proof;
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 1rem;
+  color: var(--ink-light);
+  line-height: 1.7;
+  align-items: baseline;
+}
+
+.Proof--Step:last-child {
+  border-bottom: none;
+}
+
+.Proof--Step::before {
+  content: counter(proof, decimal-leading-zero);
+  font-size: 0.9375rem;
+  color: var(--ink-faint);
+  flex-shrink: 0;
+  font-weight: 400;
+}
+
+.FontToggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.FontToggle .Btn {
+  font-size: 0.9375rem;
+}
+
+.FontToggle--IBM {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.FontToggle--Menlo {
+  font-family: 'Menlo', monospace;
+}
+
+.FontToggle--PT {
+  font-family: 'PT Mono', monospace;
+}
+
+.Sampler {
+  max-width: 850px;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+}

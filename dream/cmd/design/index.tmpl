@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mathvis — design sampler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=PT+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="Sampler">
+
+  <div class="FontToggle">
+    <button class="Btn Btn--Primary FontToggle--IBM active" data-font="ibm">IBM Plex Mono</button>
+    <button class="Btn Btn--Primary FontToggle--Menlo" data-font="menlo">Menlo</button>
+    <button class="Btn Btn--Primary FontToggle--PT" data-font="pt">PT Mono</button>
+  </div>
+
+  <hr>
+
+  <div class="Section--Label">Typography</div>
+
+  <h1>Fourier transform</h1>
+  <h2>Continuous Fourier transform</h2>
+  <h3>Definition and properties</h3>
+
+  <p>
+    The Fourier transform decomposes a function of time (a signal) into
+    its constituent frequencies. The transform of a function
+    <span class="Math--Inline">f(x)</span> is conventionally denoted
+    <span class="Math--Inline">f&#x0302;(&#x03BE;)</span>, where
+    <span class="Math--Inline">&#x03BE;</span> represents frequency in
+    cycles per unit of the independent variable.
+  </p>
+
+  <div class="Math--Block">
+    f&#x0302;(&#x03BE;) = &#x222B;<sub>&#x2212;&#x221E;</sub><sup>&#x221E;</sup> f(x) e<sup>&#x2212;2&#x03C0;ix&#x03BE;</sup> dx
+  </div>
+
+  <p>
+    The integral converges absolutely when
+    <span class="Math--Inline">f &#x2208; L&#x00B9;(&#x211D;)</span> and the
+    resulting transform <span class="Math--Inline">f&#x0302;</span> is
+    uniformly continuous and vanishes at infinity by the
+    Riemann&ndash;Lebesgue lemma.
+  </p>
+
+  <hr>
+
+  <div class="Section--Label">Inputs &amp; Controls</div>
+
+  <div class="Controls--Row">
+    <div class="Controls--Group">
+      <label>Expression</label>
+      <input type="text" class="Controls--Expression" value="sin(x) / x">
+    </div>
+    <div class="Controls--Group">
+      <label>x min</label>
+      <input type="number" class="Controls--Number" value="-12">
+    </div>
+    <div class="Controls--Group">
+      <label>x max</label>
+      <input type="number" class="Controls--Number" value="12">
+    </div>
+    <div class="Controls--Group">
+      <label>Samples</label>
+      <select>
+        <option>256</option>
+        <option selected>512</option>
+        <option>1024</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="Controls--Group">
+    <label>Frequency &#x03BE;</label>
+  </div>
+  <div class="Controls--Slider">
+    <input type="range" id="freq-slider" min="0.05" max="2.0" step="0.01" value="0.50">
+    <span class="Controls--Readout" id="freq-readout">0.50</span>
+  </div>
+
+  <div class="Controls--Actions">
+    <button class="Btn Btn--Primary">Evaluate</button>
+    <button class="Btn Btn--Secondary">Reset</button>
+  </div>
+
+  <div class="Controls--Tags">
+    <span class="Tag">L&#x00B9; integrable</span>
+    <span class="Tag">continuous</span>
+    <span class="Tag">absolutely convergent</span>
+  </div>
+
+  <hr>
+
+  <div class="Section--Label">Visualization</div>
+
+  <div class="Vis">
+    <div class="Vis--Label">f(x) = sin(x) / x</div>
+    <canvas class="Vis--Canvas" id="plot-canvas"></canvas>
+  </div>
+
+  <hr>
+
+  <div class="Section--Label">Proof Steps</div>
+
+  <ol class="Proof">
+    <li class="Proof--Step">Let <span class="Math--Inline">f &#x2208; L&#x00B9;(&#x211D;)</span> be an integrable function on the real line.</li>
+    <li class="Proof--Step">Define the Fourier transform <span class="Math--Inline">f&#x0302;(&#x03BE;) = &#x222B; f(x) e<sup>&#x2212;2&#x03C0;ix&#x03BE;</sup> dx</span> for all <span class="Math--Inline">&#x03BE; &#x2208; &#x211D;</span>.</li>
+    <li class="Proof--Step">Since <span class="Math--Inline">|f(x) e<sup>&#x2212;2&#x03C0;ix&#x03BE;</sup>| = |f(x)|</span>, the integrand is dominated by <span class="Math--Inline">|f|</span>.</li>
+    <li class="Proof--Step">By the dominated convergence theorem, <span class="Math--Inline">f&#x0302;</span> is continuous.</li>
+    <li class="Proof--Step">The Riemann&ndash;Lebesgue lemma gives <span class="Math--Inline">f&#x0302;(&#x03BE;) &#x2192; 0</span> as <span class="Math--Inline">|&#x03BE;| &#x2192; &#x221E;</span>.</li>
+  </ol>
+
+  <hr>
+
+  <div class="Section--Label">Dividers</div>
+
+  <p>The horizontal rules above and below demonstrate the <span class="Math--Inline">&lt;hr&gt;</span> treatment: 1px solid <span class="Math--Inline">--rule</span> with 2rem vertical margin.</p>
+
+  <hr>
+
+</div>
+<script src="/static/js/sampler.js"></script>
+</body>
+</html>
