@@ -5,7 +5,7 @@ import (
 	"math/rand"
 )
 
-// --- Distributions ---
+const MMDSimilarityThreshold = 0.005
 
 type Distribution struct {
 	Name   string
@@ -63,8 +63,6 @@ var distributions = map[string]Distribution{
 	"skewed":   Skewed,
 }
 
-// --- Kernel and RKHS operations ---
-
 func RBF(a, b, sigma float64) float64 {
 	d := a - b
 	return math.Exp(-d * d / (2 * sigma * sigma))
@@ -100,6 +98,12 @@ func MMDSquared(samplesP, samplesQ []float64, sigma float64) float64 {
 	eQQ /= float64(m * m)
 	ePQ /= float64(n * m)
 	return ePP + eQQ - 2*ePQ
+}
+
+func MMD(samplesP, samplesQ []float64, sigma float64) (mmd, mmd2 float64) {
+	mmd2 = MMDSquared(samplesP, samplesQ, sigma)
+	mmd = math.Sqrt(math.Max(0, mmd2))
+	return
 }
 
 func linspace(lo, hi float64, n int) []float64 {

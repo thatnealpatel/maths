@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"math"
 	"math/rand"
 	"net/http"
 	"sort"
@@ -43,23 +42,15 @@ func NewServer(params Params, tmpl *template.Template) *Server {
 
 func (s *Server) resample() {
 	rng := rand.New(rand.NewSource(s.params.Seed))
-	s.samplesP = make([]float64, s.params.N)
-	s.samplesQ = make([]float64, s.params.N)
 	P := distributions[s.params.DistP]
 	Q := distributions[s.params.DistQ]
+	s.samplesP = make([]float64, s.params.N)
+	s.samplesQ = make([]float64, s.params.N)
 	for i := 0; i < s.params.N; i++ {
 		s.samplesP[i] = P.Sample(rng)
 		s.samplesQ[i] = Q.Sample(rng)
 	}
 	s.plots = make(map[string][]byte)
-}
-
-var plotNames = []string{
-	"01_kernel_functions",
-	"02_mean_embedding",
-	"03_mmd_comparison",
-	"04_gram_matrix",
-	"05_sigma_sweep",
 }
 
 func (s *Server) generatePlot(name string) ([]byte, error) {
@@ -82,32 +73,48 @@ func (s *Server) generatePlot(name string) ([]byte, error) {
 	}
 }
 
-func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Server) statsJSON() ([]byte, error) {
+	mmd, mmd2 := MMD(s.samplesP, s.samplesQ, s.params.Sigma)
+	return json.Marshal(map[string]any{
+		"distP":   s.params.DistP,
+		"distQ":   s.params.DistQ,
+		"sigma":   s.params.Sigma,
+		"n":       s.params.N,
+		"seed":    s.params.Seed,
+		"mmd2":    mmd2,
+		"mmd":     mmd,
+		"similar": mmd2 < MMDSimilarityThreshold,
+	})
+}
 
-	mmd2 := MMDSquared(s.samplesP, s.samplesQ, s.params.Sigma)
-	mmd := math.Sqrt(math.Max(0, mmd2))
-
+func (s *Server) distNames() []string {
 	names := make([]string, 0, len(distributions))
 	for k := range distributions {
 		names = append(names, k)
 	}
 	sort.Strings(names)
+	return names
+}
+
+func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	mmd, mmd2 := MMD(s.samplesP, s.samplesQ, s.params.Sigma)
 
 	data := struct {
-		DistP     string
-		DistQ     string
-		Sigma     float64
-		N         int
-		Seed      int64
-		MMD2      float64
-		MMD       float64
-		DistNames []string
+		DistP, DistQ string
+		Sigma        float64
+		N            int
+		Seed         int64
+		MMD2, MMD    float64
+		Similar      bool
+		DistNames    []string
 	}{
 		DistP:     s.params.DistP,
 		DistQ:     s.params.DistQ,
@@ -116,17 +123,18 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		Seed:      s.params.Seed,
 		MMD2:      mmd2,
 		MMD:       mmd,
-		DistNames: names,
+		Similar:   mmd2 < MMDSimilarityThreshold,
+		DistNames: s.distNames(),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	s.tmpl.Execute(w, data)
+	if err := s.tmpl.Execute(w, data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) HandlePlot(w http.ResponseWriter, r *http.Request) {
-	// Path is /plot/{name}.svg — extract name.
 	path := r.URL.Path
-	// Strip "/plot/" prefix and ".svg" suffix.
 	if len(path) <= len("/plot/")+len(".svg") {
 		http.NotFound(w, r)
 		return
@@ -152,32 +160,23 @@ func (s *Server) HandlePlot(w http.ResponseWriter, r *http.Request) {
 	w.Write(svg)
 }
 
-func (s *Server) statsJSON() []byte {
-	mmd2 := MMDSquared(s.samplesP, s.samplesQ, s.params.Sigma)
-	mmd := math.Sqrt(math.Max(0, mmd2))
-	data := map[string]any{
-		"distP": s.params.DistP,
-		"distQ": s.params.DistQ,
-		"sigma": s.params.Sigma,
-		"n":     s.params.N,
-		"seed":  s.params.Seed,
-		"mmd2":  mmd2,
-		"mmd":   mmd,
-	}
-	b, _ := json.Marshal(data)
-	return b
-}
-
 func (s *Server) HandleRegenerate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
+
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.params.Seed = rand.Int63()
 	s.resample()
-	b := s.statsJSON()
-	s.mu.Unlock()
+
+	b, err := s.statsJSON()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)
@@ -187,6 +186,8 @@ func (s *Server) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if v := q.Get("p"); v != "" {
 		if _, ok := distributions[v]; ok {
 			s.params.DistP = v
@@ -208,8 +209,12 @@ func (s *Server) HandleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.resample()
-	b := s.statsJSON()
-	s.mu.Unlock()
+
+	b, err := s.statsJSON()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)

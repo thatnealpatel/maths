@@ -121,7 +121,7 @@
     <strong>seed</strong> = {{.Seed}}<br>
     <strong>MMD&sup2;</strong> = {{printf "%.6f" .MMD2}} &nbsp;&nbsp;
     <strong>MMD</strong> = {{printf "%.6f" .MMD}} &nbsp;&nbsp;
-    {{if lt .MMD2 0.005}}<span class="verdict similar">similar</span>{{else}}<span class="verdict different">different</span>{{end}}
+    {{if .Similar}}<span class="verdict similar">similar</span>{{else}}<span class="verdict different">different</span>{{end}}
   </div>
 
   <section id="kernels">
@@ -252,7 +252,7 @@ function refreshPlots(stats) {
 }
 
 function updateStats(s) {
-  var similar = s.mmd2 < 0.005;
+  var similar = s.similar;
   document.getElementById('stats').innerHTML =
     '<strong>P</strong> = ' + s.distP + ' &nbsp;&nbsp;' +
     '<strong>Q</strong> = ' + s.distQ + ' &nbsp;&nbsp;' +

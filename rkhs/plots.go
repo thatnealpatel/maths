@@ -9,6 +9,18 @@ import (
 	"github.com/aclements/go-gg/table"
 )
 
+const (
+	maxKernelCurves    = 12
+	maxEmbeddingCurves = 20
+	maxGramSize        = 40
+)
+
+func renderSVG(plot *gg.Plot, w, h int) []byte {
+	var buf bytes.Buffer
+	plot.WriteSVG(&buf, w, h)
+	return buf.Bytes()
+}
+
 func plotKernelFunctions(dist Distribution, samples []float64, sigma float64, grid []float64) ([]byte, error) {
 	var xs, ys []float64
 	var series []string
@@ -19,10 +31,7 @@ func plotKernelFunctions(dist Distribution, samples []float64, sigma float64, gr
 		series = append(series, "P(x) = "+dist.Name)
 	}
 
-	show := len(samples)
-	if show > 12 {
-		show = 12
-	}
+	show := min(len(samples), maxKernelCurves)
 	for i := 0; i < show; i++ {
 		xi := samples[i]
 		label := fmt.Sprintf("K(x%d=%.2f, ·)", i, xi)
@@ -48,19 +57,14 @@ func plotKernelFunctions(dist Distribution, samples []float64, sigma float64, gr
 		gg.AxisLabel("y", "value"),
 	)
 
-	var buf bytes.Buffer
-	plot.WriteSVG(&buf, 900, 500)
-	return buf.Bytes(), nil
+	return renderSVG(plot, 900, 500), nil
 }
 
 func plotMeanEmbedding(dist Distribution, samples []float64, sigma float64, grid []float64) ([]byte, error) {
 	var xs, ys []float64
 	var series []string
 
-	show := len(samples)
-	if show > 20 {
-		show = 20
-	}
+	show := min(len(samples), maxEmbeddingCurves)
 	for i := 0; i < show; i++ {
 		xi := samples[i]
 		for _, t := range grid {
@@ -97,35 +101,28 @@ func plotMeanEmbedding(dist Distribution, samples []float64, sigma float64, grid
 		gg.AxisLabel("y", "value"),
 	)
 
-	var buf bytes.Buffer
-	plot.WriteSVG(&buf, 900, 500)
-	return buf.Bytes(), nil
+	return renderSVG(plot, 900, 500), nil
 }
 
 func plotMMD(distP, distQ Distribution, samplesP, samplesQ []float64, sigma float64, grid []float64) ([]byte, error) {
 	var xs, ys []float64
 	var series []string
 
-	muPVals := make([]float64, len(grid))
+	muP := make([]float64, len(grid))
+	muQ := make([]float64, len(grid))
 	for i, t := range grid {
-		muPVals[i] = MeanEmbedding(samplesP, t, sigma)
-		xs = append(xs, t)
-		ys = append(ys, muPVals[i])
-		series = append(series, "μ̂_P ("+distP.Name+")")
-	}
-
-	muQVals := make([]float64, len(grid))
-	for i, t := range grid {
-		muQVals[i] = MeanEmbedding(samplesQ, t, sigma)
-		xs = append(xs, t)
-		ys = append(ys, muQVals[i])
-		series = append(series, "μ̂_Q ("+distQ.Name+")")
+		muP[i] = MeanEmbedding(samplesP, t, sigma)
+		muQ[i] = MeanEmbedding(samplesQ, t, sigma)
 	}
 
 	for i, t := range grid {
-		xs = append(xs, t)
-		ys = append(ys, math.Abs(muPVals[i]-muQVals[i]))
-		series = append(series, "|μ̂_P − μ̂_Q| pointwise")
+		xs = append(xs, t, t, t)
+		ys = append(ys, muP[i], muQ[i], math.Abs(muP[i]-muQ[i]))
+		series = append(series,
+			"μ̂_P ("+distP.Name+")",
+			"μ̂_Q ("+distQ.Name+")",
+			"|μ̂_P − μ̂_Q| pointwise",
+		)
 	}
 
 	tb := table.NewBuilder(nil)
@@ -133,8 +130,7 @@ func plotMMD(distP, distQ Distribution, samplesP, samplesQ []float64, sigma floa
 	tb.Add("y", ys)
 	tb.Add("series", series)
 
-	mmd2 := MMDSquared(samplesP, samplesQ, sigma)
-	mmd := math.Sqrt(math.Max(0, mmd2))
+	mmd, mmd2 := MMD(samplesP, samplesQ, sigma)
 
 	plot := gg.NewPlot(tb.Done())
 	plot.GroupBy("series")
@@ -146,24 +142,19 @@ func plotMMD(distP, distQ Distribution, samplesP, samplesQ []float64, sigma floa
 		gg.AxisLabel("y", "value"),
 	)
 
-	var buf bytes.Buffer
-	plot.WriteSVG(&buf, 900, 500)
-	return buf.Bytes(), nil
+	return renderSVG(plot, 900, 500), nil
 }
 
 func plotGramHeatmap(samples []float64, sigma float64) ([]byte, error) {
-	n := len(samples)
-	if n > 40 {
-		n = 40
-	}
-	sub := samples[:n]
+	n := min(len(samples), maxGramSize)
+	samples = samples[:n]
 
 	var xs, ys, vals []float64
 	for i := 0; i < n; i++ {
 		for j := 0; j < n; j++ {
 			xs = append(xs, float64(j))
 			ys = append(ys, float64(n-1-i))
-			vals = append(vals, RBF(sub[i], sub[j], sigma))
+			vals = append(vals, RBF(samples[i], samples[j], sigma))
 		}
 	}
 
@@ -180,9 +171,7 @@ func plotGramHeatmap(samples []float64, sigma float64) ([]byte, error) {
 		gg.AxisLabel("y", "i"),
 	)
 
-	var buf bytes.Buffer
-	plot.WriteSVG(&buf, 600, 550)
-	return buf.Bytes(), nil
+	return renderSVG(plot, 600, 550), nil
 }
 
 func plotSigmaSweep(distP, distQ Distribution, samplesP, samplesQ []float64) ([]byte, error) {
@@ -191,14 +180,10 @@ func plotSigmaSweep(distP, distQ Distribution, samplesP, samplesQ []float64) ([]
 	var series []string
 
 	for _, s := range sigmas {
-		m2 := MMDSquared(samplesP, samplesQ, s)
-		xs = append(xs, s)
-		ys = append(ys, math.Max(0, m2))
-		series = append(series, "MMD²")
-
-		xs = append(xs, s)
-		ys = append(ys, math.Sqrt(math.Max(0, m2)))
-		series = append(series, "MMD")
+		mmd, mmd2 := MMD(samplesP, samplesQ, s)
+		xs = append(xs, s, s)
+		ys = append(ys, mmd2, mmd)
+		series = append(series, "MMD²", "MMD")
 	}
 
 	tb := table.NewBuilder(nil)
@@ -216,7 +201,5 @@ func plotSigmaSweep(distP, distQ Distribution, samplesP, samplesQ []float64) ([]
 		gg.AxisLabel("y", "distance"),
 	)
 
-	var buf bytes.Buffer
-	plot.WriteSVG(&buf, 900, 400)
-	return buf.Bytes(), nil
+	return renderSVG(plot, 900, 400), nil
 }
