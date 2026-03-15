@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RKHS Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    line-height: 1.7;
+    color: #111;
+    background: #fafafa;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* --- layout --- */
+  .page { max-width: 880px; margin: 0 auto; padding: 3rem 2rem 4rem; }
+
+  /* --- header --- */
+  header { margin-bottom: 3rem; }
+  header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 2px; }
+  header p { font-weight: 300; color: #888; font-size: 12px; }
+
+  /* --- nav --- */
+  nav { display: flex; gap: 1.5rem; margin-bottom: 2.5rem; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+  nav a { color: #999; text-decoration: none; transition: color 0.15s; }
+  nav a:hover { color: #111; }
+
+  /* --- controls --- */
+  .controls {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end;
+    padding: 1rem 1.5rem; margin: 0 -2rem 2rem;
+    background: rgba(250,250,250,0.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .controls label { display: flex; flex-direction: column; gap: 5px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #999; }
+  .controls select, .controls input[type="range"] {
+    font-family: 'JetBrains Mono', monospace; font-size: 14px;
+    border: none; outline: none;
+  }
+  .controls select {
+    min-width: 10rem; padding: 10px 12px;
+    border: 1px solid #ccc; border-radius: 3px;
+    background: #fff; color: #111; transition: border-color 0.15s;
+  }
+  .controls select:focus { border-color: #111; }
+  .controls input[type="range"] { width: 8rem; accent-color: #111; cursor: pointer; }
+  .controls .range-wrap { display: flex; align-items: center; gap: 8px; }
+  .controls .range-val { font-size: 13px; font-weight: 600; color: #111; min-width: 3rem; }
+  button {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 10px 20px; border: 1px solid #111; border-radius: 3px;
+    background: #fff; color: #111; cursor: pointer; transition: background 0.15s;
+  }
+  button:hover { background: #f0f0f0; }
+
+  /* --- stats --- */
+  .stats {
+    background: #fff; padding: 1rem 1.25rem; border-radius: 3px;
+    border: 1px solid #e0e0e0; margin-bottom: 3rem;
+    font-size: 12px; line-height: 2;
+  }
+  .stats strong { font-weight: 600; }
+  .stats .verdict { display: inline-block; padding: 1px 6px; border-radius: 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stats .verdict.similar { background: #e8f5e9; color: #2e7d32; }
+  .stats .verdict.different { background: #fce4ec; color: #c62828; }
+
+  /* --- sections --- */
+  section { margin-bottom: 3.5rem; scroll-margin-top: 5rem; }
+  section h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  section .desc { font-size: 13px; font-weight: 300; color: #444; margin-bottom: 1.25rem; line-height: 1.9; }
+  section .try { font-size: 12px; color: #777; margin-bottom: 1.25rem; line-height: 1.8; font-style: italic; }
+  section img { width: 100%; height: auto; display: block; }
+
+  /* --- separator between sections --- */
+  section + section { padding-top: 3.5rem; border-top: 1px solid #eee; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header>
+    <h1>RKHS Explorer</h1>
+    <p>Reproducing Kernel Hilbert Space visualizations</p>
+  </header>
+
+  <nav>
+    <a href="#kernels">Kernels</a>
+    <a href="#embedding">Embedding</a>
+    <a href="#mmd">MMD</a>
+    <a href="#gram">Gram</a>
+    <a href="#sweep">Sweep</a>
+  </nav>
+
+  <div class="controls" id="controls">
+    <label>P<select id="inp-p">{{range $name := .DistNames}}
+      <option value="{{$name}}"{{if eq $name $.DistP}} selected{{end}}>{{$name}}</option>{{end}}
+    </select></label>
+    <label>Q<select id="inp-q">{{range $name := .DistNames}}
+      <option value="{{$name}}"{{if eq $name $.DistQ}} selected{{end}}>{{$name}}</option>{{end}}
+    </select></label>
+    <label>&sigma;<div class="range-wrap"><input type="range" id="inp-sigma" value="{{.Sigma}}" step="0.05" min="0.05" max="3.0"><span class="range-val" id="val-sigma">{{printf "%.2f" .Sigma}}</span></div></label>
+    <label>n<div class="range-wrap"><input type="range" id="inp-n" value="{{.N}}" step="1" min="1" max="30"><span class="range-val" id="val-n">{{.N}}</span></div></label>
+    <button type="button" id="btn-resample">Resample</button>
+  </div>
+
+  <div class="stats" id="stats">
+    <strong>P</strong> = {{.DistP}} &nbsp;&nbsp;
+    <strong>Q</strong> = {{.DistQ}} &nbsp;&nbsp;
+    <strong>&sigma;</strong> = {{printf "%.3f" .Sigma}} &nbsp;&nbsp;
+    <strong>n</strong> = {{.N}} &nbsp;&nbsp;
+    <strong>seed</strong> = {{.Seed}}<br>
+    <strong>MMD&sup2;</strong> = {{printf "%.6f" .MMD2}} &nbsp;&nbsp;
+    <strong>MMD</strong> = {{printf "%.6f" .MMD}} &nbsp;&nbsp;
+    {{if lt .MMD2 0.005}}<span class="verdict similar">similar</span>{{else}}<span class="verdict different">different</span>{{end}}
+  </div>
+
+  <section id="kernels">
+    <h2>1 &mdash; Kernel Functions</h2>
+    <p class="desc">
+      A kernel function K(x, y) measures similarity between two points. The RBF (radial basis function) kernel
+      K(x, y) = exp(&minus;||x&minus;y||&sup2; / 2&sigma;&sup2;) returns 1 when x = y and decays toward 0 as points
+      move apart. Each sample x<sub>i</sub> drawn from distribution P creates a function K(x<sub>i</sub>, &middot;)
+      &mdash; a Gaussian bump centered at that sample. These functions live in the RKHS, an infinite-dimensional
+      function space where inner products correspond to kernel evaluations. The bandwidth &sigma; controls how
+      localized each bump is: small &sigma; produces narrow spikes that resolve fine structure, while large &sigma;
+      creates broad humps that blur nearby samples together.
+    </p>
+    <p class="try">
+      Try: set &sigma; to 0.1 and watch the kernels become needle-thin. Then increase to 2.0 &mdash; individual
+      samples merge into a single lobe. With n = 3 or 4 you can see each kernel clearly; with n = 50 they overlap
+      into a dense forest.
+    </p>
+    <img src="/plot/01_kernel_functions.svg" alt="Kernel Functions">
+  </section>
+
+  <section id="embedding">
+    <h2>2 &mdash; Mean Embedding</h2>
+    <p class="desc">
+      The mean embedding &mu;<sub>P</sub> maps an entire probability distribution into the RKHS by averaging the
+      kernel functions of its samples: &mu;&#x0302;<sub>P</sub>(t) = (1/n) &Sigma;<sub>i</sub> K(x<sub>i</sub>, t).
+      This is the central idea &mdash; we represent a distribution not by its density, but by a single function
+      in the RKHS. With a characteristic kernel like the RBF, this mapping is injective: distinct distributions
+      produce distinct embeddings. As n increases, the empirical mean embedding converges to the true (population)
+      mean embedding, which in turn approximates a smoothed version of the underlying PDF. The plot shows
+      individual kernel functions faded in the background, their average in bold, and the true PDF for reference.
+    </p>
+    <p class="try">
+      Try: compare n = 5 vs n = 100. With few samples the embedding is jagged and sample-dependent; with many it
+      hugs the true PDF shape. Switch P to "bimodal" to see how the embedding faithfully captures both modes.
+    </p>
+    <img src="/plot/02_mean_embedding.svg" alt="Mean Embedding">
+  </section>
+
+  <section id="mmd">
+    <h2>3 &mdash; MMD Comparison</h2>
+    <p class="desc">
+      Maximum Mean Discrepancy (MMD) is the RKHS distance between two mean embeddings:
+      MMD(P, Q) = ||&mu;<sub>P</sub> &minus; &mu;<sub>Q</sub>||<sub>H</sub>. It is computed entirely from kernel
+      evaluations without ever estimating densities. When MMD &asymp; 0 the two distributions are indistinguishable
+      under this kernel; large MMD means the distributions differ. The plot shows &mu;&#x0302;<sub>P</sub> and
+      &mu;&#x0302;<sub>Q</sub> side by side, with the pointwise absolute difference |&mu;&#x0302;<sub>P</sub>(t)
+      &minus; &mu;&#x0302;<sub>Q</sub>(t)| highlighting where they diverge. The title reports both MMD&sup2;
+      (the quantity actually computed) and MMD (its square root, the metric).
+    </p>
+    <p class="try">
+      Try: set P = Q = gaussian. MMD should be near zero &mdash; both embeddings overlap. Now change Q to
+      "skewed" or "uniform" and watch the gap open up. Increase n to reduce sampling noise and get a cleaner
+      separation.
+    </p>
+    <img src="/plot/03_mmd_comparison.svg" alt="MMD Comparison">
+  </section>
+
+  <section id="gram">
+    <h2>4 &mdash; Gram Matrix</h2>
+    <p class="desc">
+      The Gram matrix G<sub>ij</sub> = K(x<sub>i</sub>, x<sub>j</sub>) is the n&times;n matrix of all pairwise
+      kernel similarities among the samples from P. The diagonal is always 1 (a point is maximally similar to
+      itself). Off-diagonal values reveal structure: if samples cluster into groups, the matrix shows bright
+      blocks along the diagonal. For a unimodal distribution like a Gaussian the matrix tends to be smoothly
+      graded; for a bimodal distribution you should see two distinct bright blocks. The Gram matrix is the object
+      that kernel methods (SVM, kernel PCA, etc.) actually operate on &mdash; it encodes all the geometric
+      information the kernel can see.
+    </p>
+    <p class="try">
+      Try: set P = bimodal with n = 30&ndash;40 and look for the 2&times;2 block structure. Then switch to
+      uniform &mdash; the matrix becomes more homogeneous. Decrease &sigma; to sharpen the blocks (each sample
+      only "sees" its nearest neighbors); increase &sigma; to wash out all structure.
+    </p>
+    <img src="/plot/04_gram_matrix.svg" alt="Gram Matrix">
+  </section>
+
+  <section id="sweep">
+    <h2>5 &mdash; Sigma Sweep</h2>
+    <p class="desc">
+      The bandwidth &sigma; is the single most important hyperparameter. Too small, and the kernel functions are
+      so narrow that every finite sample looks unique &mdash; MMD is dominated by noise. Too large, and everything
+      is smoothed into a single blob &mdash; even genuinely different distributions become indistinguishable. This
+      plot sweeps &sigma; from 0.1 to 3.0 and shows MMD&sup2; and MMD at each value. The peak of the curve is
+      the bandwidth at which the kernel is most sensitive to the actual distributional difference. In practice,
+      methods like the median heuristic (&sigma; = median of pairwise distances) aim to land near this sweet spot.
+    </p>
+    <p class="try">
+      Try: compare gaussian vs bimodal &mdash; the peak is clear and wide. Then compare gaussian vs gaussian
+      (same distribution): the curve should stay near zero everywhere, confirming there is no real difference to
+      detect. Compare uniform vs skewed for an interesting asymmetric shape.
+    </p>
+    <img src="/plot/05_sigma_sweep.svg" alt="Sigma Sweep">
+  </section>
+
+</div>
+
+<script>
+var inFlight = false, pending = false;
+function triggerUpdate() {
+  if (inFlight) { pending = true; return; }
+  doUpdate();
+}
+
+function doUpdate() {
+  inFlight = true;
+  var params = new URLSearchParams({
+    p: document.getElementById('inp-p').value,
+    q: document.getElementById('inp-q').value,
+    sigma: document.getElementById('inp-sigma').value,
+    n: document.getElementById('inp-n').value
+  });
+  fetch('/update?' + params)
+    .then(function(r) { return r.json(); })
+    .then(refreshPlots)
+    .finally(function() {
+      inFlight = false;
+      if (pending) { pending = false; doUpdate(); }
+    });
+}
+
+function refreshPlots(stats) {
+  var t = Date.now();
+  document.querySelectorAll('section img').forEach(function(img) {
+    img.src = img.src.replace(/\?.*$/, '') + '?t=' + t;
+  });
+  updateStats(stats);
+}
+
+function updateStats(s) {
+  var similar = s.mmd2 < 0.005;
+  document.getElementById('stats').innerHTML =
+    '<strong>P</strong> = ' + s.distP + ' &nbsp;&nbsp;' +
+    '<strong>Q</strong> = ' + s.distQ + ' &nbsp;&nbsp;' +
+    '<strong>&sigma;</strong> = ' + s.sigma.toFixed(3) + ' &nbsp;&nbsp;' +
+    '<strong>n</strong> = ' + s.n + ' &nbsp;&nbsp;' +
+    '<strong>seed</strong> = ' + s.seed + '<br>' +
+    '<strong>MMD&sup2;</strong> = ' + s.mmd2.toFixed(6) + ' &nbsp;&nbsp;' +
+    '<strong>MMD</strong> = ' + s.mmd.toFixed(6) + ' &nbsp;&nbsp;' +
+    '<span class="verdict ' + (similar ? 'similar' : 'different') + '">' +
+    (similar ? 'similar' : 'different') + '</span>';
+}
+
+document.getElementById('inp-p').addEventListener('change', triggerUpdate);
+document.getElementById('inp-q').addEventListener('change', triggerUpdate);
+
+document.getElementById('inp-sigma').addEventListener('input', function() {
+  document.getElementById('val-sigma').textContent = parseFloat(this.value).toFixed(2);
+  triggerUpdate();
+});
+document.getElementById('inp-n').addEventListener('input', function() {
+  document.getElementById('val-n').textContent = this.value;
+  triggerUpdate();
+});
+
+document.getElementById('btn-resample').addEventListener('click', function() {
+  fetch('/regenerate', {method: 'POST'}).then(function(r) { return r.json(); }).then(refreshPlots);
+});
+</script>
+</body>
+</html>
