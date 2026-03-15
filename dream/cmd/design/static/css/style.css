@@ -161,7 +161,12 @@ hr {
 }
 
 .Controls--Expression {
-  width: 200px;
+  width: 100%;
+}
+
+.Controls--Group:has(.Controls--Expression) {
+  flex: 1 1 200px;
+  min-width: 120px;
 }
 
 .Controls--Number {
@@ -335,6 +340,23 @@ input[type="range"]::-moz-range-thumb {
 
 .FontToggle--PT {
   font-family: 'PT Mono', monospace;
+}
+
+.Page {
+  max-width: 850px;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  text-decoration-color: var(--ink);
 }
 
 .Sampler {

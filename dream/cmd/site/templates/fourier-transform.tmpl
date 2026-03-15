@@ -1,0 +1,202 @@
+{{define "content"}}
+<h1>Fourier Transform</h1>
+<h2>Continuous Fourier Transform</h2>
+
+<p>
+    The Fourier transform decomposes a function of time into its constituent
+    frequencies. Enter a function <span class="Math--Inline">f(x)</span> below
+    to see its time-domain graph and frequency-domain magnitude spectrum.
+</p>
+
+<div class="Math--Block">
+    f&#x0302;(&#x03BE;) = &#x222B;<sub>&#x2212;&#x221E;</sub><sup>&#x221E;</sup> f(x) e<sup>&#x2212;2&#x03C0;ix&#x03BE;</sup> dx
+</div>
+
+<hr>
+
+<div class="Section--Label">Controls</div>
+
+<div class="Controls--Row">
+    <div class="Controls--Group">
+        <label>f(x)</label>
+        <input type="text" class="Controls--Expression" name="expr" value="sin(x) / x" id="expr-input"
+               hx-post="/fourier-transform/compute"
+               hx-include="#expr-input,#xmin-input,#xmax-input,#samples-input"
+               hx-swap="none"
+               hx-on::after-request="handleResponse(event)"
+               hx-trigger="load, input">
+    </div>
+    <div class="Controls--Group">
+        <label>x min</label>
+        <input type="number" class="Controls--Number" name="xmin" value="-12" id="xmin-input"
+               hx-post="/fourier-transform/compute"
+               hx-include="#expr-input,#xmin-input,#xmax-input,#samples-input"
+               hx-swap="none"
+               hx-on::after-request="handleResponse(event)"
+               hx-trigger="change">
+    </div>
+    <div class="Controls--Group">
+        <label>x max</label>
+        <input type="number" class="Controls--Number" name="xmax" value="12" id="xmax-input"
+               hx-post="/fourier-transform/compute"
+               hx-include="#expr-input,#xmin-input,#xmax-input,#samples-input"
+               hx-swap="none"
+               hx-on::after-request="handleResponse(event)"
+               hx-trigger="change">
+    </div>
+    <div class="Controls--Group">
+        <label>Samples</label>
+        <select name="samples" id="samples-input"
+                hx-post="/fourier-transform/compute"
+                hx-include="#expr-input,#xmin-input,#xmax-input,#samples-input"
+                hx-swap="none"
+                hx-on::after-request="handleResponse(event)"
+                hx-trigger="change">
+            <option>256</option>
+            <option selected>512</option>
+            <option>1024</option>
+        </select>
+    </div>
+</div>
+
+<div class="Controls--Actions">
+    <button class="Btn Btn--Secondary" id="reset-btn">Reset</button>
+</div>
+
+<div class="Controls--Tags">
+    <span class="Tag">L&#x00B9; integrable</span>
+    <span class="Tag">continuous</span>
+    <span class="Tag">absolutely convergent</span>
+</div>
+
+<hr>
+
+<div class="Section--Label">Time Domain</div>
+
+<div class="Vis">
+    <div class="Vis--Label" id="time-label">f(x) = sin(x) / x</div>
+    <canvas class="Vis--Canvas" id="time-canvas"></canvas>
+</div>
+
+<hr style="border-color: transparent">
+
+<div class="Section--Label">Frequency Domain</div>
+
+<div class="Vis">
+    <div class="Vis--Label">|f&#x0302;(&#x03BE;)|</div>
+    <canvas class="Vis--Canvas" id="freq-canvas"></canvas>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+function handleResponse(event) {
+    if (!event.detail.successful) {
+        document.getElementById('time-label').textContent = 'Error: ' + event.detail.xhr.responseText;
+        return;
+    }
+    drawPlots(event.detail.xhr.responseText);
+}
+
+function drawPlots(responseText) {
+    var data = JSON.parse(responseText);
+    document.getElementById('time-label').textContent = 'f(x) = ' + document.getElementById('expr-input').value;
+    plot(document.getElementById('time-canvas'), data.time.x, data.time.y, '#C0522A');
+    plot(document.getElementById('freq-canvas'), data.freq.xi, data.freq.magnitude, '#2E7D8C');
+}
+
+function plot(canvas, xs, ys, color) {
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var w = rect.width, h = rect.height;
+    var pad = {t: 15, r: 15, b: 35, l: 55};
+    var pw = w - pad.l - pad.r;
+    var ph = h - pad.t - pad.b;
+
+    var xmin = xs[0], xmax = xs[xs.length - 1];
+    var ymin = Infinity, ymax = -Infinity;
+    for (var i = 0; i < ys.length; i++) {
+        if (ys[i] < ymin) ymin = ys[i];
+        if (ys[i] > ymax) ymax = ys[i];
+    }
+    if (ymin === ymax) { ymin -= 1; ymax += 1; }
+    var ym = (ymax - ymin) * 0.08;
+    ymin -= ym; ymax += ym;
+
+    function mx(x) { return pad.l + (x - xmin) / (xmax - xmin) * pw; }
+    function my(y) { return pad.t + (ymax - y) / (ymax - ymin) * ph; }
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#D6D2C9';
+    ctx.lineWidth = 1;
+    var step = niceStep(xmax - xmin);
+    for (var gx = Math.ceil(xmin / step) * step; gx <= xmax; gx += step) {
+        ctx.beginPath(); ctx.moveTo(mx(gx), pad.t); ctx.lineTo(mx(gx), pad.t + ph); ctx.stroke();
+    }
+    step = niceStep(ymax - ymin);
+    for (var gy = Math.ceil(ymin / step) * step; gy <= ymax; gy += step) {
+        ctx.beginPath(); ctx.moveTo(pad.l, my(gy)); ctx.lineTo(pad.l + pw, my(gy)); ctx.stroke();
+    }
+
+    ctx.strokeStyle = '#A8A49C';
+    ctx.lineWidth = 1;
+    if (ymin <= 0 && ymax >= 0) {
+        ctx.beginPath(); ctx.moveTo(pad.l, my(0)); ctx.lineTo(pad.l + pw, my(0)); ctx.stroke();
+    }
+    if (xmin <= 0 && xmax >= 0) {
+        ctx.beginPath(); ctx.moveTo(mx(0), pad.t); ctx.lineTo(mx(0), pad.t + ph); ctx.stroke();
+    }
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(mx(xs[0]), my(ys[0]));
+    for (var i = 1; i < xs.length; i++) {
+        ctx.lineTo(mx(xs[i]), my(ys[i]));
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#A8A49C';
+    ctx.font = '13px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    step = niceStep(xmax - xmin);
+    for (var gx = Math.ceil(xmin / step) * step; gx <= xmax; gx += step) {
+        ctx.fillText(fmtNum(gx), mx(gx), pad.t + ph + 20);
+    }
+    ctx.textAlign = 'right';
+    step = niceStep(ymax - ymin);
+    for (var gy = Math.ceil(ymin / step) * step; gy <= ymax; gy += step) {
+        ctx.fillText(fmtNum(gy), pad.l - 8, my(gy) + 4);
+    }
+}
+
+function niceStep(span) {
+    var rough = span / 6;
+    var mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    var norm = rough / mag;
+    if (norm < 1.5) return mag;
+    if (norm < 3.5) return 2 * mag;
+    if (norm < 7.5) return 5 * mag;
+    return 10 * mag;
+}
+
+function fmtNum(n) {
+    if (Math.abs(n) < 1e-10) return '0';
+    if (Math.abs(n) >= 1000 || (Math.abs(n) < 0.01 && n !== 0)) return n.toExponential(1);
+    return parseFloat(n.toPrecision(4)).toString();
+}
+
+document.getElementById('reset-btn').addEventListener('click', function() {
+    document.getElementById('expr-input').value = 'sin(x) / x';
+    document.getElementById('xmin-input').value = '-12';
+    document.getElementById('xmax-input').value = '12';
+    document.getElementById('samples-input').value = '512';
+    htmx.trigger('#evaluate-btn', 'click');
+});
+</script>
+{{end}}
