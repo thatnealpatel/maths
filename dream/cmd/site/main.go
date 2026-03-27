@@ -18,7 +18,7 @@ var (
 	//go:embed templates
 	templateFS embed.FS
 
-	addr = flag.String("addr", ":8081", "listen address")
+	addr = flag.String("addr", ":4111", "listen address")
 )
 
 // TODO(nealpatel): Fix idioms and commit CLAUDE.md
@@ -36,6 +36,7 @@ func main() {
 	c2stTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/c2st.tmpl"))
 	spuriousTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/spurious-correlation.tmpl"))
 	emmdTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/energy-vs-mmd.tmpl"))
+	dsrTmpl := template.Must(template.Must(layoutTmpl.Clone()).ParseFS(templateFS, "templates/dsr.tmpl"))
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("cmd/site/static"))))
@@ -55,6 +56,7 @@ func main() {
 	})
 
 	handlers.RegisterFourier(mux)
+	handlers.RegisterDSR(mux)
 
 	log.Println("precomputing visualizations...")
 	rob := handlers.NewRobustness(ctx)
@@ -92,6 +94,13 @@ func main() {
 	mux.HandleFunc("GET /robustness/energy-vs-mmd", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := emmdTmpl.ExecuteTemplate(w, "layout.tmpl", map[string]string{"Title": "Energy vs. MMD"}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("GET /dsr", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := dsrTmpl.ExecuteTemplate(w, "layout.tmpl", map[string]string{"Title": "Deflated Sharpe Ratio"}); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})

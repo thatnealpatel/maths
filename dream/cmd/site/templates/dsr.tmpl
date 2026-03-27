@@ -1,0 +1,727 @@
+{{define "content"}}
+<style>
+.DSR--Grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+.DSR--Panel {
+    min-width: 0;
+}
+.DSR--Panel .Vis--Canvas {
+    height: auto;
+    aspect-ratio: 4/3;
+    min-height: 220px;
+}
+.DSR--Verdict {
+    padding: 1rem 0;
+}
+.DSR--Verdict-Big {
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 0.25rem;
+}
+.DSR--Verdict-Pass {
+    display: inline-block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid;
+    margin-top: 0.5rem;
+}
+.DSR--Verdict-Pass[data-pass="true"] {
+    color: #2E7D8C;
+    border-color: #2E7D8C;
+}
+.DSR--Verdict-Pass[data-pass="false"] {
+    color: #C0522A;
+    border-color: #C0522A;
+}
+.DSR--Verdict-Detail {
+    font-size: 0.875rem;
+    color: var(--ink-light);
+    margin-top: 0.75rem;
+}
+.DSR--Presets {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+}
+.DSR--Preset {
+    font-family: var(--font-family);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--ink-light);
+    background: none;
+    border: 1px solid var(--rule);
+    padding: 0.25rem 0.6rem;
+    cursor: pointer;
+}
+.DSR--Preset:hover {
+    background: var(--ink);
+    color: var(--paper);
+}
+.DSR--Tooltip {
+    position: fixed;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-family);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    padding: 0.4rem 0.6rem;
+    pointer-events: none;
+    display: none;
+    z-index: 10;
+}
+.DSR--Controls .Controls--Group {
+    flex: 1;
+}
+</style>
+
+<h1>Deflated Sharpe Ratio</h1>
+<p>
+    The DSR (Bailey &amp; L&#x00F3;pez de Prado 2014) tests whether the best observed
+    Sharpe ratio is significant after correcting for non-normality and the number of
+    strategies tested. SR* is the expected maximum Sharpe under the null across N trials;
+    PSR(SR*) is the probability that the observed SR exceeds it.
+</p>
+
+<hr>
+
+<div class="Section--Label">Parameters</div>
+
+<div class="Controls--Row DSR--Controls">
+    <div class="Controls--Group">
+        <label>Observed SR&#x0302;</label>
+        <div class="Controls--Slider">
+            <input type="range" name="sr" min="0" max="4" step="0.05" value="1.5"
+                   id="dsr-sr"
+                   hx-get="/dsr/data"
+                   hx-include="#dsr-n, #dsr-t, #dsr-skew, #dsr-kurt, #dsr-alpha"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="load, input"
+                   hx-on::after-request="handleDSR(event)"
+                   oninput="document.getElementById('dsr-sr-r').textContent = parseFloat(this.value).toFixed(2)">
+            <span class="Controls--Readout" id="dsr-sr-r">1.50</span>
+        </div>
+    </div>
+    <div class="Controls--Group">
+        <label>Strategies N</label>
+        <div class="Controls--Slider">
+            <input type="range" name="n" min="0" max="4" step="0.01" value="3"
+                   id="dsr-n"
+                   hx-get="/dsr/data"
+                   hx-include="#dsr-sr, #dsr-t, #dsr-skew, #dsr-kurt, #dsr-alpha"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="input"
+                   hx-on::after-request="handleDSR(event)"
+                   oninput="var v=Math.round(Math.pow(10,parseFloat(this.value))); document.getElementById('dsr-n-r').textContent = v">
+            <span class="Controls--Readout" id="dsr-n-r">1000</span>
+        </div>
+    </div>
+    <div class="Controls--Group">
+        <label>Observations T</label>
+        <div class="Controls--Slider">
+            <input type="range" name="t" min="50" max="5000" step="10" value="2000"
+                   id="dsr-t"
+                   hx-get="/dsr/data"
+                   hx-include="#dsr-sr, #dsr-n, #dsr-skew, #dsr-kurt, #dsr-alpha"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="input"
+                   hx-on::after-request="handleDSR(event)"
+                   oninput="document.getElementById('dsr-t-r').textContent = this.value">
+            <span class="Controls--Readout" id="dsr-t-r">2000</span>
+        </div>
+    </div>
+</div>
+
+<div class="Controls--Row DSR--Controls">
+    <div class="Controls--Group">
+        <label>Skewness &#x03B3;&#x2083;</label>
+        <div class="Controls--Slider">
+            <input type="range" name="skew" min="-6" max="0" step="0.01" value="-1.43"
+                   id="dsr-skew"
+                   hx-get="/dsr/data"
+                   hx-include="#dsr-sr, #dsr-n, #dsr-t, #dsr-kurt, #dsr-alpha"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="input"
+                   hx-on::after-request="handleDSR(event)"
+                   oninput="document.getElementById('dsr-skew-r').textContent = parseFloat(this.value).toFixed(2)">
+            <span class="Controls--Readout" id="dsr-skew-r">-1.43</span>
+        </div>
+    </div>
+    <div class="Controls--Group">
+        <label>Kurtosis &#x03B3;&#x2084;</label>
+        <div class="Controls--Slider">
+            <input type="range" name="kurt" min="3" max="40" step="0.1" value="8.63"
+                   id="dsr-kurt"
+                   hx-get="/dsr/data"
+                   hx-include="#dsr-sr, #dsr-n, #dsr-t, #dsr-skew, #dsr-alpha"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="input"
+                   hx-on::after-request="handleDSR(event)"
+                   oninput="document.getElementById('dsr-kurt-r').textContent = parseFloat(this.value).toFixed(1)">
+            <span class="Controls--Readout" id="dsr-kurt-r">8.6</span>
+        </div>
+    </div>
+    <div class="Controls--Group">
+        <label>Significance &#x03B1;</label>
+        <div class="Controls--Slider">
+            <input type="range" name="alpha" min="0.01" max="0.10" step="0.01" value="0.05"
+                   id="dsr-alpha"
+                   hx-get="/dsr/data"
+                   hx-include="#dsr-sr, #dsr-n, #dsr-t, #dsr-skew, #dsr-kurt"
+                   hx-swap="none"
+                   hx-sync="this:replace"
+                   hx-trigger="input"
+                   hx-on::after-request="handleDSR(event)"
+                   oninput="document.getElementById('dsr-alpha-r').textContent = parseFloat(this.value).toFixed(2)">
+            <span class="Controls--Readout" id="dsr-alpha-r">0.05</span>
+        </div>
+    </div>
+</div>
+
+<div class="DSR--Presets">
+    <button class="DSR--Preset" onclick="setPreset(0, 3, 'Gaussian')">Gaussian</button>
+    <button class="DSR--Preset" onclick="setPreset(-1.43, 8.63, 'WPUT 2\u20139 DTE')">WPUT 2&#x2013;9 DTE</button>
+    <button class="DSR--Preset" onclick="setPreset(-2.09, 12.58, 'PUT ~45 DTE')">PUT ~45 DTE</button>
+    <button class="DSR--Preset" onclick="setPreset(-4.5, 33.6, '0DTE straddle')">0DTE straddle</button>
+</div>
+
+<hr>
+
+<div class="DSR--Grid">
+    <div class="DSR--Panel">
+        <div class="Section--Label">Verdict</div>
+        <div class="DSR--Verdict" id="dsr-verdict"></div>
+    </div>
+    <div class="DSR--Panel">
+        <div class="Section--Label">SR* vs N (log scale)</div>
+        <div class="Vis">
+            <canvas class="Vis--Canvas" id="dsr-srstar-canvas"></canvas>
+        </div>
+    </div>
+    <div class="DSR--Panel">
+        <div class="Section--Label">Min Track Record Length vs SR&#x0302;</div>
+        <div class="Vis">
+            <canvas class="Vis--Canvas" id="dsr-mintrl-canvas"></canvas>
+        </div>
+    </div>
+    <div class="DSR--Panel">
+        <div class="Section--Label">PSR Heatmap (&#x03B3;&#x2083; &#x00D7; &#x03B3;&#x2084;)</div>
+        <div class="Vis">
+            <canvas class="Vis--Canvas" id="dsr-heatmap-canvas"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="DSR--Tooltip" id="dsr-tooltip"></div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+var dsrData = null;
+
+function handleDSR(event) {
+    if (!event.detail.successful) return;
+    dsrData = JSON.parse(event.detail.xhr.responseText);
+    drawVerdict();
+    drawSRStarCurve();
+    drawMinTRL();
+    drawHeatmap();
+}
+
+function setPreset(skew, kurt, label) {
+    var skewEl = document.getElementById('dsr-skew');
+    var kurtEl = document.getElementById('dsr-kurt');
+    skewEl.value = skew;
+    kurtEl.value = kurt;
+    document.getElementById('dsr-skew-r').textContent = skew.toFixed(2);
+    document.getElementById('dsr-kurt-r').textContent = kurt.toFixed(1);
+    htmx.trigger(skewEl, 'input');
+}
+
+function drawVerdict() {
+    if (!dsrData) return;
+    var v = dsrData.verdict;
+    var passStr = v.pass ? 'PASS' : 'FAIL';
+    var html = '<div class="DSR--Verdict-Big">SR* = ' + v.sr_star.toFixed(3) + '</div>';
+    html += '<div class="DSR--Verdict-Big">PSR = ' + v.psr.toFixed(3) + '</div>';
+    html += '<div class="DSR--Verdict-Pass" data-pass="' + v.pass + '">' + passStr + '</div>';
+    html += '<div class="DSR--Verdict-Detail">';
+    html += 'V = ' + v.v.toFixed(3) + '<br>';
+    html += 'SE inflation = ' + v.se_inflation.toFixed(2) + '\u00D7 vs normal';
+    html += '</div>';
+    document.getElementById('dsr-verdict').innerHTML = html;
+}
+
+function drawSRStarCurve() {
+    if (!dsrData) return;
+    var canvas = document.getElementById('dsr-srstar-canvas');
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var w = rect.width, h = rect.height;
+    var pad = {t: 15, r: 15, b: 40, l: 55};
+    var pw = w - pad.l - pad.r;
+    var ph = h - pad.t - pad.b;
+
+    var curve = dsrData.sr_star_curve;
+    var sr = parseFloat(document.getElementById('dsr-sr').value);
+    var nSlider = Math.round(Math.pow(10, parseFloat(document.getElementById('dsr-n').value)));
+
+    var yMax = 0;
+    for (var i = 0; i < curve.sr_star_values.length; i++) {
+        if (curve.sr_star_values[i] > yMax) yMax = curve.sr_star_values[i];
+    }
+    yMax = Math.max(yMax, sr) * 1.15;
+    var yMin = 0;
+
+    function mx(n) { return pad.l + (Math.log10(n) / 4) * pw; }
+    function my(y) { return pad.t + (1 - (y - yMin) / (yMax - yMin)) * ph; }
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#D6D2C9';
+    ctx.lineWidth = 1;
+    var yTicks = niceYTicks(yMin, yMax, 5);
+    for (var i = 0; i < yTicks.length; i++) {
+        ctx.beginPath(); ctx.moveTo(pad.l, my(yTicks[i])); ctx.lineTo(pad.l + pw, my(yTicks[i])); ctx.stroke();
+    }
+    var xTicks = [1, 10, 100, 1000, 10000];
+    for (var i = 0; i < xTicks.length; i++) {
+        ctx.beginPath(); ctx.moveTo(mx(xTicks[i]), pad.t); ctx.lineTo(mx(xTicks[i]), pad.t + ph); ctx.stroke();
+    }
+
+    // Shaded pass region (SR > SR*)
+    ctx.fillStyle = 'rgba(46, 125, 140, 0.1)';
+    ctx.beginPath();
+    ctx.moveTo(pad.l, my(sr));
+    for (var i = 0; i < curve.n_values.length; i++) {
+        var cx = mx(curve.n_values[i]);
+        var cy = my(Math.min(curve.sr_star_values[i], sr));
+        if (i === 0) ctx.lineTo(cx, cy); else ctx.lineTo(cx, cy);
+    }
+    ctx.lineTo(mx(curve.n_values[curve.n_values.length - 1]), my(sr));
+    ctx.closePath();
+    ctx.fill();
+
+    // SR* curve
+    ctx.strokeStyle = '#2E7D8C';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (var i = 0; i < curve.n_values.length; i++) {
+        var cx = mx(curve.n_values[i]);
+        var cy = my(curve.sr_star_values[i]);
+        if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+
+    // Current SR horizontal dashed
+    ctx.strokeStyle = '#3D3A35';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, my(sr));
+    ctx.lineTo(pad.l + pw, my(sr));
+    ctx.stroke();
+
+    // Current N vertical dashed
+    ctx.beginPath();
+    ctx.moveTo(mx(nSlider), pad.t);
+    ctx.lineTo(mx(nSlider), pad.t + ph);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Find intersection: max N where SR > SR*
+    var maxN = null;
+    for (var i = curve.n_values.length - 1; i >= 0; i--) {
+        if (curve.sr_star_values[i] <= sr) {
+            maxN = curve.n_values[i];
+            break;
+        }
+    }
+    if (maxN !== null && maxN < 9999) {
+        var ix = mx(maxN);
+        var iy = my(sr);
+        ctx.fillStyle = '#3D3A35';
+        ctx.beginPath();
+        ctx.arc(ix, iy, 3.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.font = '11px IBM Plex Mono, monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('N\u2264' + Math.round(maxN), ix + 6, iy - 4);
+    }
+
+    // Axes labels
+    ctx.fillStyle = '#A8A49C';
+    ctx.font = '13px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (var i = 0; i < xTicks.length; i++) {
+        ctx.fillText(xTicks[i].toLocaleString(), mx(xTicks[i]), pad.t + ph + 6);
+    }
+    ctx.fillText('N', pad.l + pw / 2, pad.t + ph + 22);
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (var i = 0; i < yTicks.length; i++) {
+        ctx.fillText(yTicks[i].toFixed(1), pad.l - 8, my(yTicks[i]));
+    }
+}
+
+function drawMinTRL() {
+    if (!dsrData) return;
+    var canvas = document.getElementById('dsr-mintrl-canvas');
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var w = rect.width, h = rect.height;
+    var pad = {t: 15, r: 15, b: 40, l: 60};
+    var pw = w - pad.l - pad.r;
+    var ph = h - pad.t - pad.b;
+
+    var curves = dsrData.mintrl_curves;
+    var sr = parseFloat(document.getElementById('dsr-sr').value);
+
+    var xMin = 0.5, xMax = 4.0;
+    var yMax = 0;
+    for (var i = 0; i < curves.mintrl_actual.length; i++) {
+        var v = curves.mintrl_actual[i];
+        if (v >= 0 && v > yMax) yMax = v;
+    }
+    for (var i = 0; i < curves.mintrl_normal.length; i++) {
+        var v = curves.mintrl_normal[i];
+        if (v >= 0 && v > yMax) yMax = v;
+    }
+    yMax = Math.min(yMax * 1.1, 50000);
+    if (yMax < 100) yMax = 5000;
+    var yMin = 0;
+
+    function mx(x) { return pad.l + (x - xMin) / (xMax - xMin) * pw; }
+    function my(y) { return pad.t + (1 - (y - yMin) / (yMax - yMin)) * ph; }
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#D6D2C9';
+    ctx.lineWidth = 1;
+    var yTicks = niceYTicks(yMin, yMax, 5);
+    for (var i = 0; i < yTicks.length; i++) {
+        ctx.beginPath(); ctx.moveTo(pad.l, my(yTicks[i])); ctx.lineTo(pad.l + pw, my(yTicks[i])); ctx.stroke();
+    }
+    var xTicks = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
+    for (var i = 0; i < xTicks.length; i++) {
+        ctx.beginPath(); ctx.moveTo(mx(xTicks[i]), pad.t); ctx.lineTo(mx(xTicks[i]), pad.t + ph); ctx.stroke();
+    }
+
+    // Normal reference (dashed)
+    ctx.strokeStyle = '#A8A49C';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    var started = false;
+    for (var i = 0; i < curves.sr_values.length; i++) {
+        var v = curves.mintrl_normal[i];
+        if (v < 0 || v > yMax) continue;
+        var cx = mx(curves.sr_values[i]);
+        var cy = my(v);
+        if (!started) { ctx.moveTo(cx, cy); started = true; } else ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Actual curve (terra cotta)
+    ctx.strokeStyle = '#C0522A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    started = false;
+    for (var i = 0; i < curves.sr_values.length; i++) {
+        var v = curves.mintrl_actual[i];
+        if (v < 0 || v > yMax) continue;
+        var cx = mx(curves.sr_values[i]);
+        var cy = my(v);
+        if (!started) { ctx.moveTo(cx, cy); started = true; } else ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+
+    // Vertical dashed at current SR
+    if (sr >= xMin && sr <= xMax) {
+        ctx.strokeStyle = '#3D3A35';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(mx(sr), pad.t);
+        ctx.lineTo(mx(sr), pad.t + ph);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Label MinTRL values at current SR
+        var idx = Math.round((sr - 0.5) / 0.05);
+        if (idx >= 0 && idx < curves.mintrl_actual.length) {
+            var va = curves.mintrl_actual[idx];
+            var vn = curves.mintrl_normal[idx];
+            ctx.font = '11px IBM Plex Mono, monospace';
+            ctx.textAlign = 'left';
+            if (va >= 0 && va <= yMax) {
+                ctx.fillStyle = '#C0522A';
+                ctx.fillText(Math.round(va), mx(sr) + 5, my(va) - 6);
+            }
+            if (vn >= 0 && vn <= yMax) {
+                ctx.fillStyle = '#A8A49C';
+                ctx.fillText(Math.round(vn), mx(sr) + 5, my(vn) + 14);
+            }
+        }
+    }
+
+    // Axes labels
+    ctx.fillStyle = '#A8A49C';
+    ctx.font = '13px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (var i = 0; i < xTicks.length; i++) {
+        ctx.fillText(xTicks[i].toFixed(1), mx(xTicks[i]), pad.t + ph + 6);
+    }
+    ctx.fillText('SR\u0302', pad.l + pw / 2, pad.t + ph + 22);
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (var i = 0; i < yTicks.length; i++) {
+        var label = yTicks[i] >= 1000 ? (yTicks[i]/1000).toFixed(0) + 'k' : yTicks[i].toFixed(0);
+        ctx.fillText(label, pad.l - 8, my(yTicks[i]));
+    }
+}
+
+function drawHeatmap() {
+    if (!dsrData) return;
+    var canvas = document.getElementById('dsr-heatmap-canvas');
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var w = rect.width, h = rect.height;
+    var pad = {t: 15, r: 15, b: 40, l: 50};
+    var pw = w - pad.l - pad.r;
+    var ph = h - pad.t - pad.b;
+
+    var hm = dsrData.psr_heatmap;
+    var nCols = hm.skew_values.length;
+    var nRows = hm.kurt_values.length;
+    var cellW = pw / nCols;
+    var cellH = ph / nRows;
+    var alpha = parseFloat(document.getElementById('dsr-alpha').value);
+    var curSkew = parseFloat(document.getElementById('dsr-skew').value);
+    var curKurt = parseFloat(document.getElementById('dsr-kurt').value);
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (var si = 0; si < nCols; si++) {
+        for (var ki = 0; ki < nRows; ki++) {
+            var psr = hm.psr_grid[si][ki];
+            var x = pad.l + si * cellW;
+            var y = pad.t + (nRows - 1 - ki) * cellH;
+
+            if (psr < 0) {
+                ctx.fillStyle = '#EDEAE2';
+            } else {
+                ctx.fillStyle = psrColor(psr);
+            }
+            ctx.fillRect(x, y, cellW + 0.5, cellH + 0.5);
+        }
+    }
+
+    // Pass/fail contour
+    ctx.strokeStyle = '#3D3A35';
+    ctx.lineWidth = 2;
+    var threshold = 1 - alpha;
+    for (var si = 0; si < nCols - 1; si++) {
+        for (var ki = 0; ki < nRows - 1; ki++) {
+            var v00 = hm.psr_grid[si][ki];
+            var v10 = hm.psr_grid[si+1][ki];
+            var v01 = hm.psr_grid[si][ki+1];
+            var v11 = hm.psr_grid[si+1][ki+1];
+            drawContourCell(ctx, pad, nRows, si, ki, cellW, cellH, v00, v10, v01, v11, threshold);
+        }
+    }
+
+    // DTE preset markers
+    var presets = [
+        {skew: 0, kurt: 3, label: 'N'},
+        {skew: -1.43, kurt: 8.63, label: '2\u20139'},
+        {skew: -2.09, kurt: 12.58, label: '45'},
+        {skew: -4.5, kurt: 33.6, label: '0D'}
+    ];
+    ctx.font = '10px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    for (var i = 0; i < presets.length; i++) {
+        var p = presets[i];
+        var px = pad.l + (p.skew - hm.skew_values[0]) / (hm.skew_values[nCols-1] - hm.skew_values[0]) * pw;
+        var py = pad.t + (1 - (p.kurt - hm.kurt_values[0]) / (hm.kurt_values[nRows-1] - hm.kurt_values[0])) * ph;
+        ctx.fillStyle = '#3D3A35';
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillText(p.label, px, py - 5);
+    }
+
+    // Crosshair at current (skew, kurt)
+    var cxPos = pad.l + (curSkew - hm.skew_values[0]) / (hm.skew_values[nCols-1] - hm.skew_values[0]) * pw;
+    var cyPos = pad.t + (1 - (curKurt - hm.kurt_values[0]) / (hm.kurt_values[nRows-1] - hm.kurt_values[0])) * ph;
+    ctx.strokeStyle = '#3D3A35';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(cxPos, pad.t); ctx.lineTo(cxPos, pad.t + ph); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad.l, cyPos); ctx.lineTo(pad.l + pw, cyPos); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Axes
+    ctx.fillStyle = '#A8A49C';
+    ctx.font = '13px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    var skewTicks = [-6, -5, -4, -3, -2, -1, 0];
+    for (var i = 0; i < skewTicks.length; i++) {
+        var tx = pad.l + (skewTicks[i] - hm.skew_values[0]) / (hm.skew_values[nCols-1] - hm.skew_values[0]) * pw;
+        ctx.fillText(skewTicks[i], tx, pad.t + ph + 6);
+    }
+    ctx.fillText('\u03B3\u2083', pad.l + pw / 2, pad.t + ph + 22);
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    var kurtTicks = [3, 10, 20, 30, 40];
+    for (var i = 0; i < kurtTicks.length; i++) {
+        var ty = pad.t + (1 - (kurtTicks[i] - hm.kurt_values[0]) / (hm.kurt_values[nRows-1] - hm.kurt_values[0])) * ph;
+        ctx.fillText(kurtTicks[i], pad.l - 8, ty);
+    }
+    ctx.save();
+    ctx.translate(12, pad.t + ph / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('\u03B3\u2084', 0, 0);
+    ctx.restore();
+}
+
+function drawContourCell(ctx, pad, nRows, si, ki, cellW, cellH, v00, v10, v01, v11, threshold) {
+    if (v00 < 0 || v10 < 0 || v01 < 0 || v11 < 0) return;
+    var idx = 0;
+    if (v00 >= threshold) idx |= 1;
+    if (v10 >= threshold) idx |= 2;
+    if (v01 >= threshold) idx |= 4;
+    if (v11 >= threshold) idx |= 8;
+    if (idx === 0 || idx === 15) return;
+
+    var x0 = pad.l + si * cellW + cellW / 2;
+    var y0 = pad.t + (nRows - 1 - ki) * cellH - cellH / 2;
+    var x1 = x0 + cellW;
+    var y1 = y0 - cellH;
+
+    function lerp(a, b, va, vb) {
+        var t = (threshold - va) / (vb - va);
+        return a + t * (b - a);
+    }
+
+    var segments = [];
+    var bot  = [lerp(x0, x1, v00, v10), y0];
+    var top  = [lerp(x0, x1, v01, v11), y1];
+    var left = [x0, lerp(y0, y1, v00, v01)];
+    var right= [x1, lerp(y0, y1, v10, v11)];
+
+    switch (idx) {
+    case 1: case 14: segments.push([bot, left]); break;
+    case 2: case 13: segments.push([bot, right]); break;
+    case 3: case 12: segments.push([left, right]); break;
+    case 4: case 11: segments.push([top, left]); break;
+    case 5: case 10: segments.push([bot, right], [top, left]); break;
+    case 6: case 9:  segments.push([bot, top]); break;
+    case 7: case 8:  segments.push([top, right]); break;
+    }
+
+    for (var s = 0; s < segments.length; s++) {
+        ctx.beginPath();
+        ctx.moveTo(segments[s][0][0], segments[s][0][1]);
+        ctx.lineTo(segments[s][1][0], segments[s][1][1]);
+        ctx.stroke();
+    }
+}
+
+function psrColor(psr) {
+    var t = Math.max(0, Math.min(1, psr));
+    var r = Math.round(192 + (46 - 192) * t);
+    var g = Math.round(82 + (125 - 82) * t);
+    var b = Math.round(42 + (140 - 42) * t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+function niceYTicks(yMin, yMax, n) {
+    var range = yMax - yMin;
+    var rough = range / n;
+    var mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    var norm = rough / mag;
+    var step;
+    if (norm < 1.5) step = 1 * mag;
+    else if (norm < 3) step = 2 * mag;
+    else if (norm < 7) step = 5 * mag;
+    else step = 10 * mag;
+    var ticks = [];
+    var start = Math.ceil(yMin / step) * step;
+    for (var v = start; v <= yMax; v += step) {
+        ticks.push(v);
+    }
+    return ticks;
+}
+
+(function() {
+    var tip = document.getElementById('dsr-tooltip');
+    var canvas = document.getElementById('dsr-heatmap-canvas');
+    canvas.addEventListener('mousemove', function(e) {
+        if (!dsrData) return;
+        var hm = dsrData.psr_heatmap;
+        var rect = canvas.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        var y = e.clientY - rect.top;
+        var pad = {t: 15, r: 15, b: 40, l: 50};
+        var pw = rect.width - pad.l - pad.r;
+        var ph = rect.height - pad.t - pad.b;
+        var nCols = hm.skew_values.length;
+        var nRows = hm.kurt_values.length;
+        var col = Math.floor((x - pad.l) / (pw / nCols));
+        var row = nRows - 1 - Math.floor((y - pad.t) / (ph / nRows));
+        if (col >= 0 && col < nCols && row >= 0 && row < nRows) {
+            var psr = hm.psr_grid[col][row];
+            var skew = hm.skew_values[col];
+            var kurt = hm.kurt_values[row];
+            if (psr >= 0) {
+                tip.innerHTML = '\u03B3\u2083 = ' + skew.toFixed(1) + ', \u03B3\u2084 = ' + kurt.toFixed(0) + '<br>PSR = ' + psr.toFixed(3);
+                tip.style.display = 'block';
+                tip.style.left = (e.clientX + 12) + 'px';
+                tip.style.top = (e.clientY + 12) + 'px';
+                return;
+            }
+        }
+        tip.style.display = 'none';
+    });
+    canvas.addEventListener('mouseleave', function() {
+        tip.style.display = 'none';
+    });
+})();
+</script>
+{{end}}

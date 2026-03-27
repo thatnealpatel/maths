@@ -61,10 +61,10 @@ func NewRobustness(ctx context.Context) *Robustness {
 	h.concDefault = concCompute(200, rand.New(rand.NewSource(50)))
 
 	log.Println("  c2st: computing power surface (this takes a while)...")
-	h.c2stDefault = c2stCompute(ctx)
+	// h.c2stDefault = c2stCompute(ctx)
 
 	log.Println("  energy-vs-mmd: computing permutation tests...")
-	h.emmdDefault = emmdCompute(ctx)
+	// h.emmdDefault = emmdCompute(ctx)
 
 	return h
 }
@@ -442,6 +442,7 @@ func (h *Robustness) handleEMMDData(w http.ResponseWriter, r *http.Request) {
 }
 
 func emmdCompute(ctx context.Context) emmdResult {
+	return emmdResult{}
 	const (
 		nPerGroup = 200
 		nReps     = 50
@@ -601,7 +602,7 @@ func (h *Robustness) handleC2STData(w http.ResponseWriter, r *http.Request) {
 // TODO(nealpatel): Without refectoring, generated
 // code took ~4.5 minutes to finish on M3 MBA.
 func c2stCompute(ctx context.Context) c2stGridResult {
-	return c2stGridResult{}
+	// return c2stGridResult{}
 	const (
 		nReps     = 30  // set to 50 for tighter std dev
 		nPerGroup = 500 // n=1000 permutations that pass Stage 1 (e.g. DSR)
